@@ -2,6 +2,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
 from app.config import settings
@@ -34,3 +36,16 @@ for router in (accounts.router, categories.router, documents.router, transaction
 @app.get("/api/health")
 def health():
     return {"status": "ok", "claude_available": claude_extractor.is_available(), "storage": settings.storage_backend}
+
+
+# Serve the built frontend when it exists (deploy-local.sh / Docker image).
+# API routes are declared above, so they take precedence; anything else is the SPA.
+if settings.frontend_dist.is_dir():
+    app.mount("/assets", StaticFiles(directory=settings.frontend_dist / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend(path: str):
+        requested = settings.frontend_dist / path
+        if path and requested.is_file():
+            return FileResponse(requested)
+        return FileResponse(settings.frontend_dist / "index.html")

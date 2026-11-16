@@ -4,6 +4,22 @@ Personal finance app: import bank statements, extract and categorize transaction
 
 ## Run locally
 
+One command builds the frontend and starts everything on http://localhost:8000 (needs Python 3.12 + [uv](https://docs.astral.sh/uv/) and Node 20+):
+
+```bash
+./deploy-local.sh          # build + start (logs in backend/data/server.log)
+./deploy-local.sh stop
+```
+
+Docker (same image as Cloud Run, built from the repository root):
+
+```bash
+docker build -f backend/Dockerfile -t spendings .
+docker run -p 8080:8080 -v "$PWD/backend/data:/data" --env-file backend/.env spendings
+```
+
+### Development mode (hot reload)
+
 Backend (Python 3.12, [uv](https://docs.astral.sh/uv/)):
 
 ```bash

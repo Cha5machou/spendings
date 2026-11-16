@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     default_currency: str = "EUR"
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # Built frontend (vite build). When the folder exists the backend serves it,
+    # so one process is enough: http://localhost:8000
+    frontend_dist: Path = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+
     @property
     def resolved_database_url(self) -> str:
         if self.database_url:
