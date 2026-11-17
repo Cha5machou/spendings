@@ -8,7 +8,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 import app.models  # noqa: F401  (registers the tables)
 from app.database import get_session
-from app.routers import goals, setup
+from app.routers import goals, scheduled, setup
 
 
 @pytest.fixture
@@ -18,6 +18,7 @@ def client():
     application = FastAPI()
     application.include_router(goals.router, prefix="/api")
     application.include_router(setup.router, prefix="/api")
+    application.include_router(scheduled.router, prefix="/api")
 
     def session_override():
         with Session(engine) as session:
@@ -58,3 +59,12 @@ def test_setup_starts_empty_and_follows_the_data(client):
     client.post("/api/goals", json={"title": "Save"})
     steps = {step["key"]: step["done"] for step in client.get("/api/setup").json()["steps"]}
     assert steps["goals"] is True and steps["accounts"] is False
+
+
+def test_scheduled_payments_are_validated_and_sorted(client):
+    assert client.post("/api/scheduled", json={"label": "Tax", "date": "2026-12-28", "amount": 358}).status_code == 201
+    assert client.post("/api/scheduled", json={"label": "Tax", "date": "2026-11-26", "amount": 357}).status_code == 201
+    assert [item["date"] for item in client.get("/api/scheduled").json()] == ["2026-11-26", "2026-12-28"]
+    assert client.post("/api/scheduled", json={"label": "Tax", "date": "2026-12-28", "amount": -5}).status_code == 422
+    assert client.post("/api/scheduled", json={"date": "2026-12-28", "amount": 5}).status_code == 422
+    assert client.delete("/api/scheduled/999").status_code == 404

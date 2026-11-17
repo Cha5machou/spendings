@@ -422,7 +422,20 @@ export interface ChatMessage {
   content: string
 }
 
+export interface ScheduledPayment {
+  id: number
+  label: string
+  date: string
+  amount: number
+  notes: string | null
+}
+
 export const api = {
+  scheduled: {
+    list: () => request<ScheduledPayment[]>('/scheduled'),
+    create: (payload: { label: string; date: string; amount: number; notes?: string | null }) => request<ScheduledPayment>('/scheduled', json('POST', payload)),
+    remove: (id: number) => request<void>(`/scheduled/${id}`, { method: 'DELETE' }),
+  },
   setup: { get: () => request<SetupStatus>('/setup') },
   goals: {
     list: () => request<Goal[]>('/goals'),

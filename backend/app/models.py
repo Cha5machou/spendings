@@ -187,6 +187,16 @@ class Payslip(SQLModel, table=True):
     bonus: float | None = None
 
 
+class ScheduledPayment(SQLModel, table=True):
+    """A known one-off payment in the future (tax instalment, annual insurance...). The plan counts it."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    label: str
+    date: datetime.date
+    amount: float  # positive = money out
+    notes: str | None = None
+
+
 class Goal(SQLModel, table=True):
     """A goal the user defines. Progress is measured against the plan's projection."""
 

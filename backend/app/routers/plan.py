@@ -12,7 +12,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.loans import add_months, annuity_payment, early_repayment_indemnity
-from app.models import AccountKind, Goal, Loan, LoanKind, PlanSettings, Property, Payslip
+from app.models import AccountKind, Goal, Loan, LoanKind, PlanSettings, Property, Payslip, ScheduledPayment
 from app.routers.loans import load_all
 
 router = APIRouter(prefix="/plan", tags=["plan"])
@@ -116,6 +116,7 @@ def build_context(session: Session) -> dict:
             buckets["cto"] += account["balance"]
 
     loans = [loan for loan in load_all(session, today) if loan["is_active"] and loan["current_balance"] > 0]
+    scheduled = session.exec(select(ScheduledPayment).where(ScheduledPayment.date > today).order_by(ScheduledPayment.date)).all()
     rent_net = 0.0
     flat_costs = 0.0
     rent_for_bank = 0.0
@@ -131,7 +132,7 @@ def build_context(session: Session) -> dict:
         "core_spending": round(core_spending, 2), "housing_cost": round(housing, 2),
         "balances": {key: round(value, 2) for key, value in buckets.items()},
         "checking": round(wealth["net_worth"]["checking"], 2),
-        "loans": loans, "property": prop,
+        "loans": loans, "property": prop, "scheduled": [(payment.date, payment.amount, payment.label) for payment in scheduled],
         "essential_typical": overview["overview"]["essential_typical"] if not overview.get("empty") else 0.0,
     }
 
@@ -188,7 +189,11 @@ def project(context: dict, settings: PlanSettings, housing_delta: float, until: 
     monthly_return = (1 + settings.expected_return_pct / 100) ** (1 / 12) - 1
     split_total = (settings.split_pea + settings.split_cto + settings.split_livrets) or 1.0
     balances = dict(context["balances"])
-    cash = context["checking"]
+    cash = context["checking"] - sum(amount for day, amount, _ in context["scheduled"] if day < start)
+    scheduled_by_month: dict[tuple[int, int], float] = {}
+    for day, amount, _ in context["scheduled"]:
+        if day >= start:
+            scheduled_by_month[(day.year, day.month)] = scheduled_by_month.get((day.year, day.month), 0.0) + amount
     sale_pot = 0.0  # proceeds of the flat, kept apart: they are meant for the next home, not for the investment split
     rows = []
     month = start
@@ -199,6 +204,8 @@ def project(context: dict, settings: PlanSettings, housing_delta: float, until: 
         spending = context["core_spending"] + (context["flat_costs"] if owns_flat else 0.0) + housing_delta + settings.new_credit_monthly
         debt = sum(amount for (kind, year, mon), amount in payments_by_month.items() if year == month.year and mon == month.month
                    and (owns_flat or kind != LoanKind.mortgage.value))
+        scheduled_now = scheduled_by_month.get((month.year, month.month), 0.0)
+        spending += scheduled_now
         events = []
         if sale_month and month == sale_month and sale:
             events.append({"type": "sale", "amount": sale["net_proceeds"]})
@@ -232,7 +239,7 @@ def project(context: dict, settings: PlanSettings, housing_delta: float, until: 
         for key in ("pea", "cto", "av"):
             balances[key] *= 1 + monthly_return
         rows.append({
-            "month": month.strftime("%Y-%m"), "income": round(income, 2), "spending": round(spending, 2), "debt_service": round(debt + new_mortgage, 2),
+            "month": month.strftime("%Y-%m"), "income": round(income, 2), "spending": round(spending, 2), "scheduled": round(scheduled_now, 2), "debt_service": round(debt + new_mortgage, 2),
             "av": settings.av_monthly, "surplus": round(surplus, 2), "invested": round(invest, 2), "cash": round(cash, 2),
             "pea": round(balances["pea"], 2), "cto": round(balances["cto"], 2), "av_balance": round(balances["av"], 2), "livrets": round(balances["livrets"], 2),
             "sale_pot": round(sale_pot, 2), "total": round(sum(balances.values()) + sale_pot, 2), "events": events,
@@ -336,6 +343,7 @@ def compute_plan(session: Session, settings: PlanSettings) -> dict:
         "sale": sale,
         "purchase": purchase,
         "goals": goals,
+        "scheduled": [{"label": label, "date": day.isoformat(), "amount": amount} for day, amount, label in context["scheduled"]],
         "split_check": round(settings.split_pea + settings.split_cto + settings.split_livrets, 2),
     }
 

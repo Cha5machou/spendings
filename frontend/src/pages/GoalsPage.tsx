@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { api, formatMoney, type Goal, type GoalKind, type GoalWithProgress, type PlanAffordability, type PlanSettingsData } from '../api'
+import { api, formatDate, formatMoney, type Goal, type GoalKind, type GoalWithProgress, type PlanAffordability, type PlanSettingsData } from '../api'
 import HelpBox from '../components/HelpBox'
 import { useLoad } from '../hooks'
 
@@ -54,6 +54,53 @@ function Affordability({ title, data }: { title: string; data: PlanAffordability
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function ScheduledPayments({ onChanged }: { onChanged: () => void }) {
+  const scheduled = useLoad(() => api.scheduled.list())
+  const [form, setForm] = useState({ label: '', date: '', amount: '' })
+  const [error, setError] = useState<string | null>(null)
+  const upcoming = (scheduled.data ?? []).filter((payment) => payment.date >= new Date().toISOString().slice(0, 10))
+
+  async function add() {
+    setError(null)
+    try {
+      await api.scheduled.create({ label: form.label.trim(), date: form.date, amount: Number(form.amount.replace(',', '.')) })
+      setForm({ label: '', date: '', amount: '' })
+      scheduled.reload()
+      onChanged()
+    } catch (addError) {
+      setError((addError as Error).message)
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>Known upcoming payments</h2>
+      <p className="small muted">One-off bills you already know about, such as an income-tax instalment, an annual insurance or a planned purchase. The projection takes them out of the month they fall in.</p>
+      {error && <div className="alert error">{error}</div>}
+      {upcoming.length > 0 && (
+        <table>
+          <tbody>
+            {upcoming.map((payment) => (
+              <tr key={payment.id}>
+                <td>{payment.label}{payment.notes && <div className="small muted">{payment.notes}</div>}</td>
+                <td className="muted small">{formatDate(payment.date)}</td>
+                <td className="amount">{formatMoney(payment.amount)}</td>
+                <td><button className="small danger" onClick={async () => { await api.scheduled.remove(payment.id); scheduled.reload(); onChanged() }}>×</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="inline-form" style={{ marginTop: 8, alignItems: 'flex-end' }}>
+        <label className="small">What<br /><input style={{ width: 220 }} placeholder="Income tax, last instalment" value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} /></label>
+        <label className="small">Date<br /><input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></label>
+        <label className="small">Amount (€)<br /><input style={{ width: 90 }} value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
+        <button className="primary" onClick={add} disabled={!form.label.trim() || !form.date || !form.amount}>Add</button>
+      </div>
     </div>
   )
 }
@@ -349,6 +396,8 @@ export default function GoalsPage() {
 
         </>
       )}
+
+      <ScheduledPayments onChanged={plan.reload} />
 
       <div className="card">
         <h2>Assumptions</h2>
