@@ -65,8 +65,8 @@ export default function InsightsPage() {
     <div>
       <h1>Analysis</h1>
       <div className="toolbar">
-        {[6, 12, 24].map((count) => (
-          <button key={count} className={count === months ? 'primary' : ''} onClick={() => setMonths(count)}>{count} months</button>
+        {[{ label: '1 month', count: 1 }, { label: '6 months', count: 6 }, { label: '12 months', count: 12 }, { label: 'All time', count: 0 }].map((range) => (
+          <button key={range.label} className={range.count === months ? 'primary' : ''} onClick={() => setMonths(range.count)}>{range.label}</button>
         ))}
         <span className="spacer" />
         <span className="small muted">
