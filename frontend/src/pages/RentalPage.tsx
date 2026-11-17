@@ -2,7 +2,7 @@ import { useState } from 'react'
 import HelpBox from '../components/HelpBox'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { api, formatDate, formatMoney, type PropertyData, type SaleScenario } from '../api'
+import { api, formatDate, formatMoney, type PropertyData, type PropertyDocument, type SaleScenario } from '../api'
 import { useLoad } from '../hooks'
 
 const axisTick = { fill: 'var(--text-secondary)', fontSize: 12 }
@@ -21,6 +21,112 @@ const EDITABLE: { key: keyof PropertyData; label: string }[] = [
   { key: 'market_value', label: 'Your estimate of the market value (€)' },
   { key: 'furnishing_and_works', label: 'Furnishing and works paid (€)' },
 ]
+
+const DOC_TYPES: Record<string, string> = {
+  syndic_call: 'Co-ownership call', syndic_minutes: 'Co-owners meeting minutes', syndic_letter: 'Syndic letter', agency_statement: 'Agency statement',
+  lease: 'Lease', tax_notice: 'Property tax notice', insurance: 'Insurance', purchase_deed: 'Purchase deed', other: 'Other',
+}
+
+function PropertyDocuments({ property, onChanged }: { property: PropertyData; onChanged: () => void }) {
+  const documents = useLoad(() => api.propertyDocuments.list(property.id), [property.id])
+  const health = useLoad(() => api.health())
+  const [readWithClaude, setReadWithClaude] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [notes, setNotes] = useState<string[]>([])
+  const [editing, setEditing] = useState<number | null>(null)
+  const [draft, setDraft] = useState<{ title: string; doc_type: string; amount_due: string; due_date: string }>({ title: '', doc_type: 'other', amount_due: '', due_date: '' })
+
+  const refresh = () => { documents.reload(); onChanged() }
+
+  async function upload(files: FileList | null) {
+    if (!files?.length) return
+    setBusy(true)
+    try {
+      const result = await api.propertyDocuments.upload(property.id, files, readWithClaude)
+      setNotes(result.warnings)
+      refresh()
+    } catch (uploadError) {
+      setNotes([(uploadError as Error).message])
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function startEdit(document: PropertyDocument) {
+    setEditing(document.id)
+    setDraft({ title: document.title ?? '', doc_type: document.doc_type, amount_due: document.amount_due?.toString() ?? '', due_date: document.due_date ?? '' })
+  }
+
+  async function saveEdit(id: number) {
+    await api.propertyDocuments.update(id, {
+      title: draft.title, doc_type: draft.doc_type, amount_due: draft.amount_due.trim() === '' ? null : Number(draft.amount_due.replace(',', '.')), due_date: draft.due_date || null,
+    })
+    setEditing(null)
+    refresh()
+  }
+
+  return (
+    <div className="card" id="documents">
+      <h2>Documents</h2>
+      <HelpBox title="What to add here" open={(documents.data?.length ?? 0) === 0}>
+        <ul>
+          <li><strong>Co-ownership calls</strong> (appel de fonds / de provisions) from your syndic: the app keeps the amount due and warns you until it is paid.</li>
+          <li>Meeting minutes, letters from the syndic, agency statements, your lease and the property tax notice: they are filed here so everything about the property is in one place.</li>
+          <li>With the Claude key, each PDF is read to find its type, amount due and due date. You can always correct what it found.</li>
+        </ul>
+      </HelpBox>
+      <div className="inline-form" style={{ marginBottom: 8 }}>
+        <input type="file" accept="application/pdf" multiple disabled={busy} onChange={(event) => upload(event.target.files)} />
+        <label className="small" title="The PDF is sent to the Claude API. It may contain other people's names: untick it if you prefer not to send it.">
+          <input type="checkbox" checked={readWithClaude} disabled={health.data ? !health.data.claude_available : false} onChange={(event) => setReadWithClaude(event.target.checked)} /> read with Claude (sends the PDF to the Claude API)
+        </label>
+        {busy && <span className="muted small">Reading…</span>}
+      </div>
+      {notes.map((note) => <div className="alert" key={note}>{note}</div>)}
+      {(documents.data ?? []).map((document) => (
+        <div className="reco" key={document.id}>
+          <div>
+            <div className="title">
+              {document.title || document.filename} <span className="chip">{DOC_TYPES[document.doc_type] ?? document.doc_type}</span>
+              {document.paid && <span className="chip positive">paid</span>}
+              {document.extracted && <span className="small muted"> · read by Claude</span>}
+            </div>
+            <div className="small muted">{[document.issuer, document.doc_date ? formatDate(document.doc_date) : null].filter(Boolean).join(' · ')}</div>
+            {document.amount_due ? (
+              <div className="small" style={{ marginTop: 2 }}>
+                Amount due <strong>{formatMoney(document.amount_due)}</strong>
+                {document.previous_balance ? ` (including ${formatMoney(document.previous_balance)} of earlier balance)` : ''}
+                {document.due_date ? ` · by ${formatDate(document.due_date)}` : ''}
+              </div>
+            ) : null}
+            {document.summary && <div className="small muted" style={{ marginTop: 4 }}>{document.summary}</div>}
+            {editing === document.id && (
+              <div className="inline-form" style={{ marginTop: 6, alignItems: 'flex-end' }}>
+                <label className="small">Title<br /><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+                <label className="small">Type<br /><select value={draft.doc_type} onChange={(event) => setDraft({ ...draft, doc_type: event.target.value })}>{Object.entries(DOC_TYPES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+                <label className="small">Amount due (€)<br /><input style={{ width: 90 }} value={draft.amount_due} onChange={(event) => setDraft({ ...draft, amount_due: event.target.value })} /></label>
+                <label className="small">Due date<br /><input type="date" value={draft.due_date} onChange={(event) => setDraft({ ...draft, due_date: event.target.value })} /></label>
+                <button className="small primary" onClick={() => saveEdit(document.id)}>Save</button>
+                <button className="small" onClick={() => setEditing(null)}>Cancel</button>
+              </div>
+            )}
+          </div>
+          <div className="inline-form" style={{ flexDirection: 'column', alignItems: 'flex-end' }}>
+            <button className="small" onClick={() => api.propertyDocuments.open(document.id)}>Open</button>
+            {document.amount_due ? (
+              <button className="small" onClick={async () => { await api.propertyDocuments.update(document.id, { paid: !document.paid }); refresh() }}>{document.paid ? 'Mark unpaid' : 'Mark paid'}</button>
+            ) : null}
+            {document.amount_due && !document.paid && document.due_date && document.due_date >= new Date().toISOString().slice(0, 10) ? (
+              <button className="small" onClick={async () => { await api.scheduled.create({ label: document.title ?? 'Co-ownership payment', date: document.due_date!, amount: document.amount_due!, notes: 'From a document on the Rental property page.' }); refresh() }}>Add to upcoming payments</button>
+            ) : null}
+            <button className="small" onClick={() => startEdit(document)}>Edit</button>
+            <button className="small danger" onClick={async () => { if (confirm('Delete this document?')) { await api.propertyDocuments.remove(document.id); refresh() } }}>Delete</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function PropertyCard({ property, onChanged }: { property: PropertyData; onChanged: () => void }) {
   const [editing, setEditing] = useState(false)
@@ -112,6 +218,8 @@ function PropertyCard({ property, onChanged }: { property: PropertyData; onChang
           ))}
         </div>
       )}
+
+      <PropertyDocuments property={property} onChanged={onChanged} />
 
       <div className="grid cols-2">
         <div className="card">

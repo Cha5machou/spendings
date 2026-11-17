@@ -187,6 +187,28 @@ class Payslip(SQLModel, table=True):
     bonus: float | None = None
 
 
+class PropertyDocument(SQLModel, table=True):
+    """A paper about a property (co-ownership call, meeting minutes, agency statement, lease, tax notice...)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    property_id: int = Field(foreign_key="property.id", index=True)
+    filename: str
+    stored_path: str
+    mime_type: str = "application/pdf"
+    size_bytes: int = 0
+    doc_type: str = "other"  # syndic_call, syndic_minutes, syndic_letter, agency_statement, lease, tax_notice, insurance, purchase_deed, other
+    title: str | None = None
+    issuer: str | None = None
+    doc_date: datetime.date | None = None
+    amount_due: float | None = None  # what the owner has to pay according to this paper
+    previous_balance: float | None = None  # earlier unpaid balance included in amount_due
+    due_date: datetime.date | None = None
+    paid: bool = False
+    summary: str | None = None
+    extracted: bool = False  # True when Claude read it
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+
 class ScheduledPayment(SQLModel, table=True):
     """A known one-off payment in the future (tax instalment, annual insurance...). The plan counts it."""
 

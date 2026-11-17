@@ -104,3 +104,47 @@ def suggest_categories(transactions: list[dict], category_names: list[str]) -> l
         return []
     allowed = set(category_names)
     return [item for item in response.parsed_output.suggestions if item.category_name in allowed]
+
+
+# --- property papers (co-ownership calls, minutes, statements...) ------------------------------
+
+PROPERTY_DOC_TYPES = ["syndic_call", "syndic_minutes", "syndic_letter", "agency_statement", "lease", "tax_notice", "insurance", "purchase_deed", "other"]
+
+
+class ExtractedPropertyDocument(BaseModel):
+    document_type: str  # one of PROPERTY_DOC_TYPES
+    title: str  # short human title, e.g. "Co-ownership call, 4th quarter 2026"
+    issuer: str | None = None  # who sent it (syndic, agency, tax office...)
+    document_date: str | None = None  # ISO date printed on the paper
+    amount_due: float | None = None  # total the owner must pay according to this paper, if it asks for money
+    previous_balance: float | None = None  # earlier unpaid balance included in amount_due, if shown
+    due_date: str | None = None  # ISO date by which it must be paid, if shown
+    summary: str  # two sentences: what it is, and what it asks of the owner
+
+
+PROPERTY_DOC_PROMPT = (
+    "This is a paper about a property the user owns (French documents are typical). "
+    f"Classify it as one of: {', '.join(PROPERTY_DOC_TYPES)}. "
+    "(syndic_call = appel de fonds / appel de provisions; syndic_minutes = procès-verbal d'assemblée générale; "
+    "agency_statement = compte-rendu de gérance of a rental agency; tax_notice = taxe foncière or similar.) "
+    "Give a short title, the sender, the printed date, and, only if the paper asks the owner to pay, the total amount due, "
+    "any earlier unpaid balance included in it, and the due date. Dates must be ISO (YYYY-MM-DD). "
+    "Summarise in two plain sentences what it is and what it asks the owner to do. Do not invent values that are not printed."
+)
+
+
+def extract_property_document(content: bytes) -> ExtractedPropertyDocument:
+    encoded = base64.standard_b64encode(content).decode("utf-8")
+    client = get_client()
+    response = client.messages.parse(
+        model=settings.claude_model,
+        max_tokens=4000,
+        messages=[{"role": "user", "content": [
+            {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": encoded}},
+            {"type": "text", "text": PROPERTY_DOC_PROMPT},
+        ]}],
+        output_format=ExtractedPropertyDocument,
+    )
+    if response.parsed_output is None:
+        raise RuntimeError("Claude returned no structured output for this document.")
+    return response.parsed_output

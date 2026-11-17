@@ -463,6 +463,23 @@ export interface FlowsData {
   totals: { money_in: number; from_income: number; shortfall: number; left_over: number; groups: Record<string, number>; shares: Record<string, number> }
 }
 
+export interface PropertyDocument {
+  id: number
+  property_id: number
+  filename: string
+  size_bytes: number
+  doc_type: string
+  title: string | null
+  issuer: string | null
+  doc_date: string | null
+  amount_due: number | null
+  previous_balance: number | null
+  due_date: string | null
+  paid: boolean
+  summary: string | null
+  extracted: boolean
+}
+
 export interface ScheduledPayment {
   id: number
   label: string
@@ -471,7 +488,27 @@ export interface ScheduledPayment {
   notes: string | null
 }
 
+async function fetchBlob(path: string): Promise<Blob> {
+  const token = await authToken()
+  const response = await fetch(`/api${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  if (!response.ok) throw new Error(response.statusText)
+  return response.blob()
+}
+
 export const api = {
+  propertyDocuments: {
+    list: (propertyId: number) => request<PropertyDocument[]>(`/property-documents?property_id=${propertyId}`),
+    upload: (propertyId: number, files: FileList, readWithClaude: boolean) => {
+      const form = new FormData()
+      form.append('property_id', String(propertyId))
+      form.append('read_with_claude', String(readWithClaude))
+      for (const file of Array.from(files)) form.append('files', file)
+      return request<{ documents: PropertyDocument[]; warnings: string[] }>('/property-documents', { method: 'POST', body: form })
+    },
+    update: (id: number, payload: Partial<PropertyDocument>) => request<PropertyDocument>(`/property-documents/${id}`, json('PATCH', payload)),
+    remove: (id: number) => request<void>(`/property-documents/${id}`, { method: 'DELETE' }),
+    open: async (id: number) => { window.open(URL.createObjectURL(await fetchBlob(`/property-documents/${id}/file`)), '_blank') },
+  },
   actions: () => request<ActionPlanData>('/actions'),
   flows: (months: number, includeOneOffs: boolean) => request<FlowsData>(`/flows?months=${months}&include_one_offs=${includeOneOffs}`),
   scheduled: {

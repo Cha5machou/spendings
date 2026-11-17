@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.loans import early_repayment_indemnity
-from app.models import Loan, LoanScheduleEntry, Property, Transaction
+from app.models import Loan, LoanScheduleEntry, Property, PropertyDocument, Transaction
 from app.routers.loans import describe
 
 router = APIRouter(prefix="/properties", tags=["properties"])
@@ -57,6 +57,38 @@ def loan_balance(session: Session, loan_id: int | None) -> tuple[Loan | None, di
         return None, None
     schedule = session.exec(select(LoanScheduleEntry).where(LoanScheduleEntry.loan_id == loan_id)).all()
     return loan, describe(loan, schedule, date.today(), session)
+
+
+def co_ownership_check(prop: Property, documents: list, transactions: list, today: date) -> dict | None:
+    """Co-ownership money to watch. With a call on file, follow it; without one, ask for it."""
+    if prop.syndic_quarterly <= 0 and not documents:
+        return None
+    calls = [doc for doc in documents if doc.doc_type == "syndic_call" and doc.amount_due]
+    if calls:
+        latest = max(calls, key=lambda doc: (doc.doc_date or doc.created_at.date(), doc.id or 0))
+        since = latest.doc_date or latest.created_at.date()
+        tolerance = max(10.0, latest.amount_due * 0.02)
+        paid = latest.paid or any(t.amount < 0 and t.date >= since and abs(-t.amount - latest.amount_due) <= tolerance for t in transactions)
+        if paid:
+            return None
+        earlier = f" ({latest.previous_balance:.2f} € of it is an earlier unpaid balance)" if latest.previous_balance else ""
+        due = f", due {latest.due_date.strftime('%d/%m/%Y')}" if latest.due_date else ""
+        return {
+            "severity": "high",
+            "title": f"Co-ownership call of {since.strftime('%d/%m/%Y')}: {latest.amount_due:.2f} € to pay",
+            "detail": f"The call on file asks {latest.amount_due:.2f} €{earlier}{due}. No matching payment appears on your accounts yet. "
+                      "If you have paid it, mark the document as paid on this page; otherwise pay it, since late fees can accrue.",
+        }
+    syndic_debits = sorted(t.date for t in transactions if t.amount < 0 and t.category_id == prop.cost_category_id and any(word in t.label.lower() for word in ("sdc", "syndic")))
+    last = syndic_debits[-1] if syndic_debits else None
+    if last is None or (today - last).days > 100:
+        return {
+            "severity": "medium",
+            "title": "Add your latest co-ownership call to follow it",
+            "detail": "No co-ownership payment appears on your accounts for over three months, and no call is on file. The syndic may have changed or some calls may be unpaid. "
+                      "Add the latest call (appel de fonds) as a document on this page: the app reads the amount due and tells you if it is still to pay.",
+        }
+    return None
 
 
 def describe_property(prop: Property, session: Session) -> dict:
@@ -131,19 +163,10 @@ def describe_property(prop: Property, session: Session) -> dict:
         levers.append({"label": "Each point less on the agency fee", "monthly": round(collected / 100, 2)})
 
     checks = []
-    if prop.syndic_quarterly > 0:
-        syndic_debits = sorted(
-            (t.date for t in transactions if t.category_id == prop.cost_category_id and t.amount < 0 and any(word in t.label.lower() for word in ("sdc", "syndic"))),
-        )
-        last_syndic = syndic_debits[-1] if syndic_debits else None
-        if last_syndic is None or (today - last_syndic).days > 100:
-            checks.append({
-                "severity": "high",
-                "title": "No co-ownership payment found since " + (last_syndic.strftime("%d/%m/%Y") if last_syndic else "the start"),
-                "detail": f"The syndic calls {prop.syndic_quarterly:.2f} € every quarter (1 January, April, July, October), plus works calls. "
-                          "Your accounts show no matching debit after the last one, so the July and October calls may be unpaid, "
-                          "or paid from an account that is not imported here. Check the syndic's owner account: arrears can bring late fees.",
-            })
+    documents = session.exec(select(PropertyDocument).where(PropertyDocument.property_id == prop.id)).all()
+    syndic_check = co_ownership_check(prop, documents, transactions, today)
+    if syndic_check:
+        checks.append(syndic_check)
     if prop.furnished:
         checks.append({
             "severity": "info",

@@ -63,7 +63,8 @@ export default function DocumentsPage() {
 02/03/2026;PRLV SEPA EDF CLIENTS;48,20;
 05/03/2026;VIREMENT SALAIRE ACME;;2450,00`}</pre>
         <a href="/example-statement.csv" download>Download this example file</a> to test the import.
-        Afterwards, check the <a href="/transactions">Transactions</a> to confirm categories.
+        Afterwards, check the <a href="/transactions">Transactions</a> to confirm categories.<br />
+        <strong>Papers about a property</strong> (co-ownership calls, syndic letters, agency statements, lease, tax notice) go on the <a href="/rental">Rental property</a> page instead.
       </HelpBox>
       <div className="card">
         <h2>Import a bank statement</h2>

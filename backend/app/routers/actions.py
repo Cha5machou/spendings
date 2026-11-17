@@ -302,10 +302,18 @@ def build_actions(session: Session, today: date, context: dict, insight_data: di
     for prop in properties:
         for check in prop["checks"]:
             title = check["title"]
-            if title.startswith("No co-ownership payment"):
-                add("week", "Check your co-ownership account for unpaid calls", check["detail"],
-                    ["Log in to the syndic's owner portal (or ask the agency) and read the account balance.", "Pay any call that is due: late fees accrue.", "Set up the direct debit so it does not happen again."],
-                    priority=1, key="syndic_arrears", link="/rental", link_label="Open rental property")
+            if title.startswith("Co-ownership call"):
+                match = re.search(r"(\d{2})/(\d{2})/(\d{4})", title)
+                add("week", title, check["detail"],
+                    ["Pay the amount shown on the call (the syndic's bank details are on the document).",
+                     "Set up the syndic's direct-debit form so future calls are paid automatically and never fall behind.",
+                     "Once paid, open Rental property, find the document and tick 'paid' (or import your next statement: it is detected automatically)."],
+                    priority=1, key="syndic_call", link="/rental", link_label="Open the document")
+            elif title.startswith("Add your latest co-ownership call"):
+                add("week", "Add your latest co-ownership call so the app can follow it", check["detail"],
+                    ["Open Rental property and scroll to Documents.", "Upload the latest call (appel de fonds / appel de provisions) from your syndic.",
+                     "Check the amount due and tick 'paid' once you have paid it."],
+                    priority=2, key="syndic_documents", link="/rental", link_label="Add the document")
             elif title.startswith("Rent revision due"):
                 match = re.search(r"(\d{2})/(\d{2})/(\d{4})", title)
                 due = date(int(match.group(3)), int(match.group(2)), int(match.group(1))) if match else None
