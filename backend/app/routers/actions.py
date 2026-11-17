@@ -144,7 +144,29 @@ def forecast_cash(session: Session, today: date, context: dict, insight_data: di
         rows.append({"date": day.isoformat(), "balance": round(balance, 2), "events": [{"label": label, "amount": round(amount, 2)} for label, amount in known if abs(amount) >= 20]})
     lowest = min(rows, key=lambda row: row["balance"])
     beyond = next((row for row in rows if row["balance"] < -limit), None)
+
+    # Each stretch of days beyond the authorised overdraft is its own problem with its own cause and relief.
+    episodes = []
+    index = 0
+    while index < len(rows):
+        if rows[index]["balance"] >= -limit:
+            index += 1
+            continue
+        start_index = index
+        while index < len(rows) and rows[index]["balance"] < -limit:
+            index += 1
+        end_index = index - 1
+        stretch = rows[start_index:end_index + 1]
+        worst = min(stretch, key=lambda row: row["balance"])
+        relief = next(((row["date"], event["label"]) for row in rows[end_index + 1:] for event in row["events"] if event["amount"] > 0), (None, None))
+        window = rows[max(0, start_index - 3):end_index + 1]
+        causes = sorted((event for row in window for event in row["events"] if event["amount"] < 0), key=lambda event: event["amount"])[:3]
+        episodes.append({
+            "start": stretch[0]["date"], "end": stretch[-1]["date"], "worst_balance": worst["balance"], "gap": round(-limit - worst["balance"], 2),
+            "relief_date": relief[0], "relief_label": relief[1], "causes": causes,
+        })
     return {
+        "episodes": episodes,
         "start_balance": round(start_balance, 2), "limit": round(limit, 2), "daily_other_spending": round(daily_other, 2),
         "salary_day": salary_day, "rows": rows,
         "lowest": {"date": lowest["date"], "balance": lowest["balance"]},
@@ -180,23 +202,24 @@ def build_actions(session: Session, today: date, context: dict, insight_data: di
     # 1. Cash in the next days ---------------------------------------------------------------
     if forecast:
         low_day = date.fromisoformat(forecast["lowest"]["date"])
-        before_payday = [e for row in forecast["rows"] if row["date"] <= forecast["lowest"]["date"] for e in row["events"] if e["amount"] < 0 and e["label"] != "Salary"]
-        biggest = sorted(before_payday, key=lambda e: e["amount"])[:3]
-        biggest_text = ", ".join(f"{e['label']} {euro(e['amount'])}" for e in biggest) if biggest else "your usual spending"
-        if forecast["first_beyond_limit"]:
-            day = date.fromisoformat(forecast["first_beyond_limit"])
-            days_away = (day - today).days
-            add("week" if days_away <= 7 else "month", f"Cover a {euro(forecast['worst_gap'])} gap before {short_date(day)}",
-                f"Your current accounts are forecast to reach {signed(forecast['lowest']['balance'])} on {short_date(low_day)}, but your authorised overdraft stops at -{euro(forecast['limit'])}. "
-                f"The pressure comes from payments before the next salary ({biggest_text}).",
-                ["Check the real balances of your accounts now against the forecast below.",
-                 f"Before {short_date(day)}, move about {euro(forecast['worst_gap'] + 100)} onto the account that will be short: from your savings, or ask your bank for a temporary overdraft increase.",
-                 "If you can, postpone one non-essential payment or purchase until after payday.",
-                 "After payday, ask the bank to move the date of your direct debits (see 'Stop living in the overdraft')."],
-                once=forecast["worst_gap"], priority=1, due=day, key="cash_gap", link="/accounts", link_label="Open accounts")
+        if forecast["episodes"]:
+            for number, episode in enumerate(forecast["episodes"][:3], start=1):
+                start, end = date.fromisoformat(episode["start"]), date.fromisoformat(episode["end"])
+                cause_text = ", ".join(f"{cause['label']} {euro(cause['amount'])}" for cause in episode["causes"]) or "your usual spending"
+                relief_text = f" until {episode['relief_label'].lower()} arrives on {short_date(date.fromisoformat(episode['relief_date']))}" if episode["relief_date"] else ""
+                when = short_date(start) if start == end else f"{short_date(start)} and {short_date(end)}"
+                add("week" if (start - today).days <= 7 else "month", f"Cover about {euro(episode['gap'])} between {when}",
+                    f"The accounts are forecast to reach {signed(episode['worst_balance'])}, which is {euro(episode['gap'])} beyond your {euro(forecast['limit'])} authorised overdraft{relief_text}. "
+                    f"What pushes them there: {cause_text}.",
+                    ["Check the real balances: this is an estimate from known payments and your usual spending.",
+                     f"Before {short_date(start)}, bring the accounts back inside the limit by about {euro(episode['gap'] + 100)}: transfer between your own accounts or from savings and cash you can reach quickly (some transfers take a day or two), "
+                     "or ask your bank for a temporary overdraft increase.",
+                     f"Where you control the date, push non-essential payments to after {short_date(date.fromisoformat(episode['relief_date'])) if episode['relief_date'] else 'payday'}.",
+                     "Avoid new instalment purchases until it is behind you."],
+                    once=episode["gap"], priority=1 if (start - today).days <= 14 else 2, due=start, key=f"cash_gap_{number}", link="/accounts", link_label="Open accounts")
         elif forecast["lowest"]["balance"] < 0:
             add(horizon_for(low_day, today) if (low_day - today).days <= 30 else "month", f"Expect to use {euro(forecast['lowest']['balance'])} of overdraft until payday",
-                f"The forecast low point is {signed(forecast['lowest']['balance'])} on {short_date(low_day)}, within your {euro(forecast['limit'])} authorised overdraft. Main payments before payday: {biggest_text}.",
+                f"The forecast low point is {signed(forecast['lowest']['balance'])} on {short_date(low_day)}, within your {euro(forecast['limit'])} authorised overdraft.",
                 ["Keep non-essential spending to a minimum until your salary arrives.", "Do not let an unexpected bill land on the low-point day."],
                 priority=2, due=low_day, key="cash_low")
 
