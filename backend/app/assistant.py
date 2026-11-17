@@ -76,7 +76,7 @@ def run_tool(name: str, arguments: dict, session: Session):
         if data.get("empty"):
             return data
         data["categories"] = [
-            {key: row[key] for key in ("name", "kind", "necessity", "average", "last_month", "recent_average", "earlier_average", "current_month", "one_off_total", "pattern", "series", "top_merchants")}
+            {key: row[key] for key in ("name", "kind", "necessity", "average", "typical", "months_basis", "last_month", "recent_average", "earlier_average", "current_month", "one_off_total", "pattern", "series", "top_merchants")}
             for row in data["categories"] if row["kind"] != "transfer"
         ]
         data["recurring"] = [entry for entry in data["recurring"] if entry["active"]]

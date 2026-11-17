@@ -95,7 +95,7 @@ export default function InsightsPage() {
             </p>
             {flows.data.totals.shortfall > 0 && (
               <p className="small negative">
-                You spend {euros(flows.data.totals.shortfall)} a month more than you earn. The "Shortfall" band is that gap: it is covered by the overdraft, by withdrawals from savings or by new credit.
+                You spend {euros(flows.data.totals.shortfall)} a month more than you earn. The red band on the left, "Spent beyond income", is that gap: it has to come from somewhere other than your income, such as the overdraft, withdrawals from savings or new credit.
               </p>
             )}
           </>
@@ -212,7 +212,7 @@ export default function InsightsPage() {
             <button onClick={() => setSelectedId(undefined)}>Close</button>
           </div>
           <div className="chips" style={{ marginBottom: 8 }}>
-            <span className="chip">Average {euros(selected.average)} / month</span>
+            <span className="chip" title="Averaged from the month it first appears, since it kept recurring">Average {euros(selected.average)} / month{selected.months_basis < data.overview.months ? ` over the last ${selected.months_basis} months` : ''}</span>
             <span className="chip">Median {euros(selected.median)}</span>
             <span className="chip">Last 3 months {euros(selected.recent_average)} vs {euros(selected.earlier_average)} before</span>
             <span className="chip">Pattern: {selected.pattern}</span>

@@ -162,6 +162,8 @@ export interface InsightCategory {
   series: number[]
   total: number
   average: number
+  typical: number
+  months_basis: number
   median: number
   recent_average: number
   earlier_average: number
@@ -422,6 +424,35 @@ export interface ChatMessage {
   content: string
 }
 
+export interface ActionItem {
+  key: string
+  horizon: 'week' | 'month' | 'quarter' | 'year'
+  title: string
+  issue: string
+  steps: string[]
+  priority: 1 | 2 | 3
+  impact: { monthly: number | null; once: number | null }
+  link: string | null
+  link_label: string | null
+  due: string | null
+}
+
+export interface ActionPlanData {
+  empty: boolean
+  headline: {
+    bullets: string[]; urgent: number; tone: 'attention' | 'ok'
+    metrics: { typical_surplus: number; debt_monthly: number; debt_share: number | null; cash_savings: number; essential_monthly: number
+      forecast_low: { date: string; balance: number } | null; forecast_limit: number | null }
+  }
+  forecast: {
+    start_balance: number; limit: number; salary_day: number | null; daily_other_spending: number
+    rows: { date: string; balance: number; events: { label: string; amount: number }[] }[]
+    lowest: { date: string; balance: number }; first_beyond_limit: string | null; worst_gap: number; days_overdrawn: number
+  } | null
+  horizons: { key: ActionItem['horizon']; label: string; actions: ActionItem[] }[]
+  routine: { title: string; when: string; link: string; status: string; due: boolean }[]
+}
+
 export interface FlowsData {
   empty: boolean
   months: number
@@ -441,6 +472,7 @@ export interface ScheduledPayment {
 }
 
 export const api = {
+  actions: () => request<ActionPlanData>('/actions'),
   flows: (months: number, includeOneOffs: boolean) => request<FlowsData>(`/flows?months=${months}&include_one_offs=${includeOneOffs}`),
   scheduled: {
     list: () => request<ScheduledPayment[]>('/scheduled'),

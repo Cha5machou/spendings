@@ -23,7 +23,7 @@ export default function StartPage() {
         <div className="toolbar">
           <strong>{done} of {data.steps.length} steps done</strong>
           <span className="spacer" />
-          {data.complete && <Link to="/"><button className="primary">Open my dashboard</button></Link>}
+          {data.complete && <Link to="/"><button className="primary">See my action plan</button></Link>}
         </div>
         <div className="progress"><div style={{ width: `${(done / data.steps.length) * 100}%` }} /></div>
 
@@ -49,7 +49,8 @@ export default function StartPage() {
       <div className="card">
         <h2>Then explore</h2>
         <ul>
-          <li><Link to="/">Dashboard</Link>: income, expenses and savings by month.</li>
+          <li><Link to="/">Action plan</Link>: what the issues are and what to do this week, this month and beyond.</li>
+          <li><Link to="/dashboard">Dashboard</Link>: income, expenses and savings by month.</li>
           <li><Link to="/insights">Analysis</Link>: where the money goes, recurring payments, what to improve.</li>
           <li><Link to="/wealth">Savings &amp; net worth</Link>: everything you own and owe.</li>
           <li><Link to="/ask">Ask</Link>: questions about your own numbers, in plain language.</li>

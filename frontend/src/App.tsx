@@ -12,6 +12,7 @@ import IncomePage from './pages/IncomePage'
 import GoalsPage from './pages/GoalsPage'
 import AskPage from './pages/AskPage'
 import StartPage from './pages/StartPage'
+import ActionPlanPage from './pages/ActionPlanPage'
 import { AuthGate, useAuth } from './auth'
 import { api } from './api'
 import { useLoad } from './hooks'
@@ -27,7 +28,8 @@ const SETUP = [
   { to: '/plan', label: 'Goals', step: 'goals' },
 ]
 const ANALYSE = [
-  { to: '/', label: 'Dashboard' },
+  { to: '/', label: 'Action plan' },
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/insights', label: 'Analysis' },
   { to: '/wealth', label: 'Savings & net worth' },
   { to: '/ask', label: 'Ask' },
@@ -74,7 +76,7 @@ function Sidebar() {
 function Home() {
   const setup = useLoad(() => api.setup.get())
   if (!setup.data) return <p className="muted">Loading…</p>
-  return setup.data.complete ? <DashboardPage /> : <Navigate to="/start" replace />
+  return setup.data.complete ? <ActionPlanPage /> : <Navigate to="/start" replace />
 }
 
 export default function App() {
@@ -87,6 +89,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/start" element={<StartPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/income" element={<IncomePage />} />
               <Route path="/loans" element={<LoansPage />} />

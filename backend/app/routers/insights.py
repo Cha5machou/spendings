@@ -78,6 +78,25 @@ def coefficient_of_variation(values: list[float]) -> float:
     return statistics.pstdev(values) / abs(mean) if mean else 0.0
 
 
+def averaging_months(series: list[float], month_count: int) -> int:
+    """How many months to divide a category's total by.
+
+    A category that started part-way through the window (a new rent, a new subscription) is averaged from the month
+    it first appears, as long as it kept recurring since: spreading it over empty months before it existed would
+    understate it. One-off or sporadic items keep the whole window, otherwise a single payment would look like a
+    monthly habit. If the first month is far bigger than the usual one it holds a catch-up of the previous month
+    (a late first salary), so the start moves back by one month."""
+    first_index = next((index for index, value in enumerate(series) if abs(value) > 0.005), 0)
+    later = [abs(value) for value in series[first_index + 1:] if abs(value) > 0.005]
+    if first_index > 0 and len(later) >= 2 and abs(series[first_index]) > 1.6 * statistics.median(later):
+        first_index -= 1
+    active_months = month_count - first_index
+    appearing = len([value for value in series[first_index:] if abs(value) > 0.005])
+    # Short histories need stronger evidence: under four months it must have appeared in every single month.
+    recurring_since_start = active_months >= 3 and appearing / active_months >= 0.75 and (active_months >= 4 or appearing == active_months)
+    return active_months if (first_index > 0 and recurring_since_start) else month_count
+
+
 def name_has(category: Category | None, *words: str) -> bool:
     return category is not None and any(word in category.name.lower() for word in words)
 
@@ -187,7 +206,13 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
             continue
         present = [value for value in series if abs(value) > 0.005]
         presence = len(present) / month_count
-        average = total / month_count
+        # A category that started part-way through the window (a new rent, a new subscription) is averaged
+        # from the month it first appears, as long as it kept recurring since. One-off or sporadic items keep the
+        # whole window, otherwise a single payment would look like a monthly habit.
+        basis_months = averaging_months(series, month_count)
+        average = total / basis_months
+        one_off_in_window = one_off_by_category.get(category_id, 0.0)
+        typical_value = (total - one_off_in_window) / basis_months if kind != CategoryKind.savings else average
         recent = series[-3:]
         earlier = series[:-3] or series
         recent_average = statistics.fmean(recent) if recent else 0.0
@@ -208,6 +233,8 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
             "series": series,
             "total": round(total, 2),
             "average": round(average, 2),
+            "typical": round(typical_value, 2),
+            "months_basis": basis_months,
             "median": round(statistics.median(series), 2) if series else 0.0,
             "recent_average": round(recent_average, 2),
             "earlier_average": round(earlier_average, 2),
@@ -250,14 +277,15 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
     one_off_total = sum(entry["one_offs"] for entry in window_series)
     income_one_off_total = sum(entry["income_one_offs"] for entry in window_series)
     saved_total = sum(entry["saved"] for entry in window_series)
-    typical_income = (income_total - income_one_off_total) / month_count
-    typical_spending = (spending_total - one_off_total) / month_count
-    essential_spending = sum(row["average"] for row in expense_rows if row["necessity"] == "essential")
-    flexible_spending = sum(row["average"] for row in expense_rows if row["necessity"] == "flexible")
-    unclassified_spending = sum(row["average"] for row in expense_rows if row["necessity"] is None)
+    typical_income = sum(row["typical"] for row in income_rows)
+    typical_spending = sum(row["typical"] for row in expense_rows)
+    saved_typical = sum(row["typical"] for row in saving_rows)
+    essential_spending = sum(row["typical"] for row in expense_rows if row["necessity"] == "essential")
+    flexible_spending = sum(row["typical"] for row in expense_rows if row["necessity"] == "flexible")
+    unclassified_spending = sum(row["typical"] for row in expense_rows if row["necessity"] is None)
     savings_rate = (typical_income - typical_spending) / typical_income if typical_income > 0 else None
 
-    essential_typical = essential_spending - sum(row["one_off_total"] for row in expense_rows if row["necessity"] == "essential") / month_count
+    essential_typical = essential_spending
     overview = {
         "essential_typical": round(essential_typical, 2),
         "window_start": window[0] if window else None,
@@ -266,7 +294,7 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
         "typical_income": round(typical_income, 2),
         "typical_spending": round(typical_spending, 2),
         "average_spending_with_one_offs": round(spending_total / month_count, 2),
-        "typical_saved_or_invested": round(saved_total / month_count, 2),
+        "typical_saved_or_invested": round(saved_typical, 2),
         "typical_surplus": round(typical_income - typical_spending, 2),
         "savings_rate": round(savings_rate, 4) if savings_rate is not None else None,
         "essential_spending": round(essential_spending, 2),
@@ -373,14 +401,14 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
 
     debt_rows = [row for row in expense_rows if name_has(categories.get(row["category_id"]), "mortgage", "loan", "credit")]
     if debt_rows and typical_income > 0:
-        debt_service = sum(row["average"] - row["one_off_total"] / month_count for row in debt_rows)
+        debt_service = sum(row["typical"] for row in debt_rows)
         ratio = debt_service / typical_income
-        breakdown = ", ".join(f"{row['name']} {euro(row['average'] - row['one_off_total'] / month_count)}" for row in debt_rows)
+        breakdown = ", ".join(f"{row['name']} {euro(row['typical'])}" for row in debt_rows)
         rental_row = next((row for row in income_rows if name_has(categories.get(row["category_id"]), "rental", "rent")), None)
         rental_note = ""
-        if rental_row and rental_row["average"] > 0:
+        if rental_row and rental_row["typical"] > 0:
             # Banks usually count about 70 % of rents as income when sizing a new loan.
-            rental_note = f" Rents received average {euro(rental_row['average'])} a month; they are already in the income used for this ratio."
+            rental_note = f" Rents received average {euro(rental_row['typical'])} a month; they are already in the income used for this ratio."
         if ratio > MAX_DEBT_RATIO:
             recommend("debt_ratio", "high", f"Debt payments take {ratio:.0%} of your income",
                       f"{breakdown} a month, above the {MAX_DEBT_RATIO:.0%} limit banks use.{rental_note} "
@@ -390,7 +418,7 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
                       f"{breakdown} a month, under the {MAX_DEBT_RATIO:.0%} limit banks use. Rental income is not counted in this ratio.")
     consumer_credit = [row for row in debt_rows if name_has(categories.get(row["category_id"]), "loan", "credit")]
     if consumer_credit:
-        monthly_credit = sum(row["average"] for row in consumer_credit)
+        monthly_credit = sum(row["typical"] for row in consumer_credit)
         names = ", ".join(merchant["name"] for row in consumer_credit for merchant in row["top_merchants"][:4])
         recommend("consumer_credit", "medium" if monthly_credit > 0.1 * typical_income else "low",
                   f"Consumer credits cost {euro(monthly_credit)} a month",
@@ -404,7 +432,7 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
         one_off_note = f" Not counted here: a one-off fee of {euro(fees_row['one_off_total'])}." if fees_row["one_off_total"] else ""
         recommend("bank_fees", "medium", f"You paid {euro(ordinary_fees)} in bank fees over {len(window)} months",
                   f"Biggest: {fee_merchants}. Incident and overdraft fees are avoidable, and card and account fees can be negotiated or dropped by moving daily banking to a free online account.{one_off_note}",
-                  monthly_impact=ordinary_fees / month_count * 0.7, category_id=fees_row["category_id"], saving=True)
+                  monthly_impact=fees_row["typical"] * 0.7, category_id=fees_row["category_id"], saving=True)
 
     for entry in overdraft:
         if entry["days_negative"] > 15:
@@ -427,11 +455,11 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
             recommend(f"trend_{row['category_id']}", "low", f"{row['name']} is trending up",
                       f"Last 3 months average {euro(row['recent_average'])} against {euro(row['earlier_average'])} before.", category_id=row["category_id"])
 
-    flexible_rows = sorted((row for row in expense_rows if row["necessity"] == "flexible"), key=lambda row: -row["average"])
+    flexible_rows = sorted((row for row in expense_rows if row["necessity"] == "flexible"), key=lambda row: -row["typical"])
     leisure_rows = [row for row in flexible_rows if not name_has(categories.get(row["category_id"]), "business", "donation", "family", "other", "cash")]
     if leisure_rows:  # trimmed below; also reused for the subscriptions check
-        trim = sum(row["average"] for row in leisure_rows[:3]) * DISCRETIONARY_TRIM
-        names = ", ".join(f"{row['name']} {euro(row['average'])}" for row in leisure_rows[:3])
+        trim = sum(row["typical"] for row in leisure_rows[:3]) * DISCRETIONARY_TRIM
+        names = ", ".join(f"{row['name']} {euro(row['typical'])}" for row in leisure_rows[:3])
         recommend("discretionary", "medium", f"A {DISCRETIONARY_TRIM:.0%} trim on your top discretionary categories frees {euro(trim)} a month",
                   f"Monthly averages: {names}. Set a monthly budget slightly under these and track it in the explorer below.",
                   monthly_impact=trim, category_id=leisure_rows[0]["category_id"], saving=True)
@@ -455,9 +483,9 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
     if business_row and business_row["total"] > 0:
         recommend("business", "medium", f"{euro(business_row['total'])} spent on your company from personal accounts",
                   "Make sure each of these is reimbursed by the company (expense report) or recorded as a shareholder loan, otherwise you finance the company yourself and lose the deduction.",
-                  monthly_impact=business_row["average"], category_id=business_row["category_id"], saving=True)
+                  monthly_impact=business_row["typical"], category_id=business_row["category_id"], saving=True)
 
-    essential_monthly = essential_spending - sum(row["one_off_total"] for row in expense_rows if row["necessity"] == "essential") / month_count
+    essential_monthly = essential_spending
     liquid_savings = sum(
         (account.statement_balance or 0.0) for account in accounts if account.kind.value == "savings" and account.is_active
     )

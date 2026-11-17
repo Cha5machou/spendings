@@ -29,7 +29,7 @@ def flows(months: int = 12, include_one_offs: bool = False, session: Session = D
 
     def typical(row: dict) -> float:
         """Average per month; single big non-repeating movements are left out unless asked for."""
-        return row["average"] - (0.0 if include_one_offs else row["one_off_total"] / month_count)
+        return row["average"] if include_one_offs else row["typical"]
 
     is_debt = lambda row: any(word in row["name"].lower() for word in ("mortgage", "loan", "credit"))  # noqa: E731
     sources: list[tuple[str, float, str | None]] = []  # (name, amount, color)
@@ -68,7 +68,7 @@ def flows(months: int = 12, include_one_offs: bool = False, session: Session = D
     shortfall = max(0.0, total_out - total_in)
     left_over = max(0.0, total_in - total_out)
     if shortfall >= MIN_FLOW:
-        sources.append(("Shortfall", shortfall, GROUP_COLORS["Shortfall"]))
+        sources.append(("Spent beyond income", shortfall, GROUP_COLORS["Shortfall"]))
 
     nodes: list[dict] = []
     index: dict[str, int] = {}

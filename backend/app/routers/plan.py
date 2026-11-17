@@ -93,7 +93,7 @@ def build_context(session: Session) -> dict:
     overview = compute_insights(months=12, session=session)
     rows = [] if overview.get("empty") else [row for row in overview["categories"] if row["kind"] == "expense"]
     months = max(overview["overview"]["months"], 1) if not overview.get("empty") else 1
-    typical = lambda row: row["average"] - row["one_off_total"] / months  # noqa: E731
+    typical = lambda row: row["typical"]  # noqa: E731
     properties = session.exec(select(Property)).all()
     prop = properties[0] if properties else None
     cost_category = prop.cost_category_id if prop else None
