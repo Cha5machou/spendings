@@ -119,6 +119,38 @@ class LoanScheduleEntry(SQLModel, table=True):
     total: float
 
 
+class Property(SQLModel, table=True):
+    """A property the user owns and (usually) rents out. Actual money flows come from transactions
+    in the linked categories; the lease terms drive the forward-looking monthly economics."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    address: str | None = None
+    furnished: bool = False
+    surface_m2: float | None = None
+    purchase_price: float | None = None  # everything included (VAT, notary fees if part of the price)
+    purchase_date: datetime.date | None = None
+    furnishing_and_works: float = 0.0  # kitchen, furniture, works paid by the owner
+    market_value: float | None = None  # the owner's own estimate, used for the sale scenario
+    loan_id: int | None = Field(default=None, foreign_key="loan.id")
+    income_category_id: int | None = Field(default=None, foreign_key="category.id")
+    cost_category_id: int | None = Field(default=None, foreign_key="category.id")
+    mortgage_category_id: int | None = Field(default=None, foreign_key="category.id")
+    # Lease
+    lease_start: datetime.date | None = None
+    monthly_rent: float = 0.0  # excluding charges
+    monthly_charges: float = 0.0  # charge provisions paid by the tenant
+    deposit: float | None = None
+    # Agency and recurring costs
+    agency: str | None = None
+    management_fee_rate: float = 0.0  # percent of rent + charges collected, VAT included
+    rent_insurance_rate: float = 0.0  # guaranteed-rent insurance, percent of rent + charges
+    syndic_quarterly: float = 0.0  # co-ownership provisions per quarter
+    property_tax_yearly: float = 0.0
+    notes: str | None = None
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+
 class Document(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     account_id: int | None = Field(default=None, foreign_key="account.id")

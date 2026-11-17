@@ -283,7 +283,58 @@ export interface WhatIf {
   renegotiation?: { new_rate: number; new_payment: number; monthly_saving: number; interest_saved: number; fees: number; net_saving: number; break_even_months: number }
 }
 
+export interface PropertyData {
+  id: number
+  name: string
+  address: string | null
+  furnished: boolean
+  surface_m2: number | null
+  purchase_price: number | null
+  purchase_date: string | null
+  furnishing_and_works: number
+  market_value: number | null
+  lease_start: string | null
+  monthly_rent: number
+  monthly_charges: number
+  deposit: number | null
+  agency: string | null
+  management_fee_rate: number
+  rent_insurance_rate: number
+  syndic_quarterly: number
+  property_tax_yearly: number
+  notes: string | null
+  checks: { severity: 'high' | 'medium' | 'low' | 'info'; title: string; detail: string }[]
+  months: { month: string; rent: number; costs: number; mortgage: number; net: number; cumulative: number }[]
+  totals: { rent: number; costs: number; mortgage: number; net: number }
+  months_with_rent: number
+  lines: { label: string; amount: number }[]
+  monthly_result: number
+  operating_result: number
+  net_from_agency: number
+  yields: { gross: number | null; net_of_costs: number | null; loan_rate: number | null }
+  levers: { label: string; monthly: number }[]
+  invested: number
+  loan: { id: number; name: string; balance: number; rate: number; remaining_months: number } | null
+}
+
+export interface SaleScenario {
+  price: number
+  agent_fee: number
+  loan_balance: number
+  early_repayment_indemnity_max: number
+  estimated_gain_tax: number
+  net_proceeds: number
+  monthly_result_if_kept: number
+  months_of_losses_equivalent: number | null
+  note: string
+}
+
 export const api = {
+  properties: {
+    list: () => request<PropertyData[]>('/properties'),
+    update: (id: number, payload: Partial<PropertyData>) => request<PropertyData>(`/properties/${id}`, json('PATCH', payload)),
+    sale: (id: number, price: number, agentFeePercent: number) => request<SaleScenario>(`/properties/${id}/sale?price=${price}&agent_fee_percent=${agentFeePercent}`),
+  },
   loans: {
     list: () => request<LoansData>('/loans'),
     create: (payload: Partial<Loan>) => request<Loan>('/loans', json('POST', payload)),

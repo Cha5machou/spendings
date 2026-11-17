@@ -6,11 +6,13 @@ import AccountsPage from './pages/AccountsPage'
 import CategoriesPage from './pages/CategoriesPage'
 import InsightsPage from './pages/InsightsPage'
 import LoansPage from './pages/LoansPage'
+import RentalPage from './pages/RentalPage'
 
 const links = [
   { to: '/', label: 'Dashboard' },
   { to: '/insights', label: 'Analysis' },
   { to: '/loans', label: 'Loans & credits' },
+  { to: '/rental', label: 'Rental property' },
   { to: '/transactions', label: 'Transactions' },
   { to: '/documents', label: 'Documents' },
   { to: '/accounts', label: 'Accounts' },
@@ -36,6 +38,7 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/loans" element={<LoansPage />} />
+            <Route path="/rental" element={<RentalPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
