@@ -7,10 +7,14 @@ import CategoriesPage from './pages/CategoriesPage'
 import InsightsPage from './pages/InsightsPage'
 import LoansPage from './pages/LoansPage'
 import RentalPage from './pages/RentalPage'
+import WealthPage from './pages/WealthPage'
+import IncomePage from './pages/IncomePage'
 
 const links = [
   { to: '/', label: 'Dashboard' },
   { to: '/insights', label: 'Analysis' },
+  { to: '/wealth', label: 'Savings & net worth' },
+  { to: '/income', label: 'Income' },
   { to: '/loans', label: 'Loans & credits' },
   { to: '/rental', label: 'Rental property' },
   { to: '/transactions', label: 'Transactions' },
@@ -37,6 +41,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/wealth" element={<WealthPage />} />
+            <Route path="/income" element={<IncomePage />} />
             <Route path="/loans" element={<LoansPage />} />
             <Route path="/rental" element={<RentalPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />

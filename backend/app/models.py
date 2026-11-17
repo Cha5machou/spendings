@@ -151,6 +151,42 @@ class Property(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
+class BalanceSnapshot(SQLModel, table=True):
+    """Balance of a savings / investment account on a given day (these accounts have no transactions)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    account_id: int = Field(foreign_key="account.id", index=True)
+    date: datetime.date
+    balance: float
+    source: str | None = None
+
+
+class Holding(SQLModel, table=True):
+    """One position inside an investment account, as of a date."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    account_id: int = Field(foreign_key="account.id", index=True)
+    name: str
+    identifier: str | None = None  # ISIN or ticker
+    asset_class: str = "other"  # cash, etf, stock, fund, structured_bond, crypto, leveraged, other
+    value: float = 0.0
+    gain_loss: float | None = None  # amount shown by the user's own tracker (sign not reliable, see notes)
+    as_of: datetime.date | None = None
+
+
+class Payslip(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    month: str = Field(index=True)  # YYYY-MM
+    employer: str | None = None
+    gross: float = 0.0
+    net_before_tax: float = 0.0
+    tax_rate: float = 0.0  # withholding rate, percent
+    tax_withheld: float = 0.0
+    net_paid: float = 0.0
+    taxable_net: float | None = None
+    bonus: float | None = None
+
+
 class Document(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     account_id: int | None = Field(default=None, foreign_key="account.id")

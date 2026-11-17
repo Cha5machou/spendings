@@ -9,7 +9,7 @@ from sqlmodel import Session
 from app.config import settings
 from app.database import create_tables, engine
 from app.extraction import claude_extractor
-from app.routers import accounts, categories, dashboard, documents, insights, loans, properties, transactions
+from app.routers import accounts, categories, dashboard, documents, income, insights, loans, properties, transactions, wealth
 from app.seed import seed_defaults
 
 
@@ -29,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for router in (accounts.router, categories.router, documents.router, transactions.router, dashboard.router, insights.router, loans.router, properties.router):
+for router in (accounts.router, categories.router, documents.router, transactions.router, dashboard.router, insights.router, loans.router, properties.router, wealth.router, income.router):
     app.include_router(router, prefix="/api")
 
 

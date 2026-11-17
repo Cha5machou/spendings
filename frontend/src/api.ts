@@ -329,7 +329,48 @@ export interface SaleScenario {
   note: string
 }
 
+export interface WealthData {
+  accounts: { account_id: number; name: string; kind: string; bank: string | null; balance: number; as_of: string | null; since_first: number | null; first_date: string | null; change_12m: number | null; holdings_total: number }[]
+  history: ({ date: string; total: number } & Record<string, number | string>)[]
+  net_worth: {
+    checking: number; cash_savings: number; invested: number; consumer_debt: number; financial: number
+    property_value: number; property_basis: string; mortgage: number; property_equity: number; total: number
+  }
+  allocation: { asset_class: string; label: string; value: number }[]
+  checks: { severity: 'high' | 'medium' | 'low' | 'info'; title: string; detail: string }[]
+  checking: { account_id: number; name: string; balance: number | null }[]
+  holdings: { account_id: number; name: string; identifier: string | null; asset_class: string; value: number; gain_loss: number | null; as_of: string | null }[]
+  liabilities: { name: string; balance: number; kind: string }[]
+}
+
+export interface IncomeData {
+  empty: boolean
+  payslips: { month: string; gross: number; net_before_tax: number; tax_rate: number; tax_withheld: number; net_paid: number; bonus: number | null }[]
+  employer: string | null
+  months: number
+  average: { gross: number; net_before_tax: number; tax_withheld: number; net_paid: number }
+  annual_gross: number
+  annual_taxable_estimate: number
+  withholding_share: number
+  marginal_rate: number
+  per: { ceiling_estimate: number; tax_saved_per_1000: number; max_tax_saved: number }
+  net_share_of_gross: number
+}
+
 export const api = {
+  wealth: {
+    get: () => request<WealthData>('/wealth'),
+    snapshot: (accountId: number, day: string, balance: number) =>
+      request<{ ok: boolean }>('/wealth/snapshots', json('POST', { account_id: accountId, date: day, balance, source: 'manual' })),
+  },
+  income: {
+    get: () => request<IncomeData>('/income'),
+    uploadPayslips: (files: FileList) => {
+      const form = new FormData()
+      for (const file of Array.from(files)) form.append('files', file)
+      return request<{ imported: string[]; failed: { filename: string; error: string }[] }>('/income/payslips', { method: 'POST', body: form })
+    },
+  },
   properties: {
     list: () => request<PropertyData[]>('/properties'),
     update: (id: number, payload: Partial<PropertyData>) => request<PropertyData>(`/properties/${id}`, json('PATCH', payload)),

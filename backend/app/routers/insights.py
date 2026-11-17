@@ -257,7 +257,9 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
     unclassified_spending = sum(row["average"] for row in expense_rows if row["necessity"] is None)
     savings_rate = (typical_income - typical_spending) / typical_income if typical_income > 0 else None
 
+    essential_typical = essential_spending - sum(row["one_off_total"] for row in expense_rows if row["necessity"] == "essential") / month_count
     overview = {
+        "essential_typical": round(essential_typical, 2),
         "window_start": window[0] if window else None,
         "window_end": window[-1] if window else None,
         "months": len(window),
