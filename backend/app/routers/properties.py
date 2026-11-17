@@ -61,7 +61,7 @@ def loan_balance(session: Session, loan_id: int | None) -> tuple[Loan | None, di
 
 def describe_property(prop: Property, session: Session) -> dict:
     today = date.today()
-    transactions = session.exec(select(Transaction).where(Transaction.date <= today)).all()
+    transactions = session.exec(select(Transaction).where(Transaction.date <= today).order_by(Transaction.date, Transaction.id)).all()
     by_month = defaultdict(lambda: {"rent": 0.0, "costs": 0.0, "mortgage": 0.0})
     for transaction in transactions:
         if transaction.category_id is None:

@@ -1,3 +1,5 @@
+import { authToken } from './auth'
+
 export type AccountKind = 'checking' | 'credit_card' | 'savings' | 'investment' | 'loan' | 'crypto' | 'other'
 export type CategoryKind = 'expense' | 'income' | 'transfer' | 'savings'
 export type CategorySource = 'none' | 'rule' | 'ai' | 'manual'
@@ -120,7 +122,10 @@ export interface Health {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, init)
+  const token = await authToken()
+  const headers = new Headers(init?.headers)
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  const response = await fetch(`/api${path}`, { ...init, headers })
   if (!response.ok) {
     let detail = response.statusText
     try {
@@ -384,7 +389,16 @@ export interface PlanData {
   split_check: number
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export const api = {
+  assistant: {
+    ask: (messages: ChatMessage[]) =>
+      request<{ answer: string; tools_used: string[]; usage: { input_tokens: number; output_tokens: number } }>('/assistant', json('POST', { messages })),
+  },
   plan: {
     get: () => request<PlanData>('/plan'),
     update: (payload: Partial<PlanSettingsData> & { clear_sale_price?: boolean; clear_purchase_price?: boolean }) => request<unknown>('/plan/settings', json('PATCH', payload)),

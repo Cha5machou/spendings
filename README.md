@@ -1,6 +1,6 @@
 # Spendings
 
-Personal finance app: import bank statements, extract and categorize transactions, and see where the money goes. Local-first (SQLite + files on disk), designed to move to GCP later (Cloud Run, Cloud Storage, Firebase Auth, Firestore).
+Personal finance app: import bank statements, extract and categorize transactions, and see where the money goes, track loans, a rented flat, savings and income, plan goals, and ask questions about your own numbers. Local-first (SQLite + files on disk) and deployable to Google Cloud (Cloud Run, Cloud SQL, Cloud Storage, Firebase Auth): see [docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md).
 
 ## Run locally
 
@@ -51,27 +51,43 @@ API docs: http://localhost:8000/docs
 
 Categories have a *kind*: `expense`, `income`, `savings` (counted as saved, not spent) or `transfer` (between your own accounts, ignored in totals).
 
+Beyond the spending core, each part has its own page:
+
+| Page | What it does |
+|---|---|
+| Ask | Ask questions about your own numbers. Claude reads your data through read-only tools and can test what-ifs on the plan without saving them |
+| Goals & plan | Month-by-month projection of what is left, where savings go, flat-share rent scenarios, sale of a property and what a new purchase could reach |
+| Analysis | Typical month, category explorer, recurring payments, overdraft usage, computed recommendations |
+| Savings & net worth | Balances and history per account, positions, allocation, net worth, emergency-fund check |
+| Income | Payslips (PDF) parsed into gross, tax withheld and net; tax bracket and PER estimate |
+| Loans & credits | Balances and schedules (official amortisation table or computed), debt-service timeline, payoff planner, prepayment and renegotiation what-ifs |
+| Rental property | Real cash flow, lease economics after agency fees, checks, sale scenario |
+
 ## Layout
 
 ```
 backend/app
   config.py        settings (env vars / .env)
-  models.py        Account, Category, CategoryRule, Document, Transaction
-  storage.py       document storage (local; GCS to be added)
-  extraction/      csv_parser, pdf_parser, claude_extractor + dispatcher
-  categorizer.py   rule engine
-  seed.py          default categories and rules
-  routers/         accounts, categories, documents, transactions, dashboard
-frontend/src
-  api.ts           typed API client
-  pages/           Dashboard, Transactions, Documents, Accounts, Categories
+  auth.py          Firebase ID-token check + e-mail allow-list (off by default)
+  models.py        tables: accounts, transactions, categories, loans, properties, snapshots, plan...
+  storage.py       document storage: local disk or Cloud Storage
+  loans.py         loan maths (projection, payoff, what-if)
+  assistant.py     Claude tool loop for the Ask page (read-only)
+  extraction/      csv_parser, xlsx_parser, pdf_parser, claude_extractor + dispatcher
+  routers/         one module per page
+backend/scripts    migrate_to_cloud.py (SQLite -> PostgreSQL + Cloud Storage)
+backend/tests      pytest suite (auth, loan maths)
+frontend/src       api.ts (typed client), auth.tsx (sign-in gate), pages/
+deploy/            Google Cloud setup and deploy scripts
+docs/              DEPLOY_GCP.md
 ```
 
-## Roadmap
+## Deploying
 
-- Loans & mortgage tracking (remaining capital, end dates, monthly cost)
-- Rental property (rent received vs. charges, fees, yield)
-- Savings & net worth (Livret A, LDDS, PEA, assurance-vie, CTO, crypto)
-- Goals (short / medium / long term) and recommendations (incl. PER, PEE/PERCO…)
-- Mortgage simulations for a new purchase
-- GCP deployment: Cloud Run (backend `Dockerfile` included), GCS storage backend, Firebase Auth, Firestore
+`./deploy-local.sh` runs everything on your machine. For Google Cloud with sign-in, follow [docs/DEPLOY_GCP.md](docs/DEPLOY_GCP.md).
+
+## Tests
+
+```bash
+cd backend && uv run pytest
+```

@@ -107,7 +107,7 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
     today = date.today()
     categories = {category.id: category for category in session.exec(select(Category)).all()}
     accounts = session.exec(select(Account)).all()
-    all_transactions = session.exec(select(Transaction).where(Transaction.date <= today)).all()
+    all_transactions = session.exec(select(Transaction).where(Transaction.date <= today).order_by(Transaction.date, Transaction.id)).all()
     if not all_transactions:
         return {"empty": True}
 
@@ -198,7 +198,7 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
             pattern = "recurring"
         else:
             pattern = "occasional"
-        merchants = sorted(category_merchants[category_id].items(), key=lambda item: -item[1]["total"])[:6]
+        merchants = sorted(category_merchants[category_id].items(), key=lambda item: (-item[1]["total"], item[0]))[:6]
         category_rows.append({
             "category_id": category_id,
             "name": category.name if category else "Uncategorized",

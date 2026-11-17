@@ -1,0 +1,5 @@
+# Builds the single image (React frontend + FastAPI backend) from the repository root.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "backend/Dockerfile", "-t", "${_IMAGE}", "."]
+images: ["${_IMAGE}"]

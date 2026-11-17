@@ -259,7 +259,11 @@ def affordability(context: dict, settings: PlanSettings, at: date, sells_flat: b
 
 @router.get("")
 def get_plan(session: Session = Depends(get_session)):
-    settings = get_settings(session)
+    return compute_plan(session, get_settings(session))
+
+
+def compute_plan(session: Session, settings: PlanSettings) -> dict:
+    """The full plan for `settings` (stored or hypothetical); nothing is saved."""
     context = build_context(session)
     rows = project(context, settings, settings.housing_delta)
 

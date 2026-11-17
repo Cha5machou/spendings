@@ -25,7 +25,7 @@ def dashboard(
     conditions = [Transaction.date >= start, Transaction.date <= end]
     if account_id is not None:
         conditions.append(Transaction.account_id == account_id)
-    transactions = session.exec(select(Transaction).where(*conditions)).all()
+    transactions = session.exec(select(Transaction).where(*conditions).order_by(Transaction.date, Transaction.id)).all()
 
     income = expenses = savings = 0.0
     by_category: dict[int | None, CategoryTotal] = {}

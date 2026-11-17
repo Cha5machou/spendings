@@ -1,15 +1,16 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
+from app.auth import require_user
 from app.config import settings
 from app.database import create_tables, engine
 from app.extraction import claude_extractor
-from app.routers import accounts, categories, dashboard, documents, income, insights, loans, plan, properties, transactions, wealth
+from app.routers import accounts, assistant, categories, dashboard, documents, income, insights, loans, plan, properties, transactions, wealth
 from app.seed import seed_defaults
 
 
@@ -21,7 +22,9 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Spendings", version="0.1.0", lifespan=lifespan)
+# The interactive API docs would reveal the whole API surface to anyone: hide them behind auth.
+docs = {} if not settings.auth_enabled else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title="Spendings", version="0.1.0", lifespan=lifespan, **docs)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -29,8 +32,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for router in (accounts.router, categories.router, documents.router, transactions.router, dashboard.router, insights.router, loans.router, properties.router, wealth.router, income.router, plan.router):
-    app.include_router(router, prefix="/api")
+for router in (accounts.router, categories.router, documents.router, transactions.router, dashboard.router, insights.router, loans.router, properties.router, wealth.router, income.router, plan.router, assistant.router):
+    app.include_router(router, prefix="/api", dependencies=[Depends(require_user)])
+
+
+@app.get("/api/config")
+def public_config():
+    """What the browser needs before signing in. Firebase web settings are public identifiers."""
+    return {
+        "auth_enabled": settings.auth_enabled,
+        "firebase": {"apiKey": settings.firebase_api_key, "authDomain": settings.firebase_auth_domain, "projectId": settings.firebase_project_id}
+        if settings.auth_enabled else None,
+    }
 
 
 @app.get("/api/health")

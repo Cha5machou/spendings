@@ -10,9 +10,12 @@ import RentalPage from './pages/RentalPage'
 import WealthPage from './pages/WealthPage'
 import IncomePage from './pages/IncomePage'
 import PlanPage from './pages/PlanPage'
+import AskPage from './pages/AskPage'
+import { AuthGate, useAuth } from './auth'
 
 const links = [
   { to: '/', label: 'Dashboard' },
+  { to: '/ask', label: 'Ask' },
   { to: '/plan', label: 'Goals & plan' },
   { to: '/insights', label: 'Analysis' },
   { to: '/wealth', label: 'Savings & net worth' },
@@ -25,8 +28,20 @@ const links = [
   { to: '/categories', label: 'Categories' },
 ]
 
+function UserBadge() {
+  const { enabled, email, signOut } = useAuth()
+  if (!enabled) return null
+  return (
+    <div className="small muted" style={{ padding: '16px 10px 0' }}>
+      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{email}</div>
+      <button className="small" style={{ marginTop: 4 }} onClick={signOut}>Sign out</button>
+    </div>
+  )
+}
+
 export default function App() {
   return (
+    <AuthGate>
     <BrowserRouter>
       <div className="layout">
         <aside className="sidebar">
@@ -38,10 +53,12 @@ export default function App() {
               </NavLink>
             ))}
           </nav>
+          <UserBadge />
         </aside>
         <main className="content">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/ask" element={<AskPage />} />
             <Route path="/plan" element={<PlanPage />} />
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/wealth" element={<WealthPage />} />
@@ -56,5 +73,6 @@ export default function App() {
         </main>
       </div>
     </BrowserRouter>
+    </AuthGate>
   )
 }
