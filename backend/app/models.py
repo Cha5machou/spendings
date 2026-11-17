@@ -187,6 +187,35 @@ class Payslip(SQLModel, table=True):
     bonus: float | None = None
 
 
+class PlanSettings(SQLModel, table=True):
+    """The user's planning assumptions (a single row, id = 1)."""
+
+    id: int | None = Field(default=1, primary_key=True)
+    # Where monthly savings go, percent of what is left after everything else (AV is a fixed plan on top).
+    split_pea: float = 50.0
+    split_cto: float = 30.0
+    split_livrets: float = 20.0
+    av_monthly: float = 100.0
+    livrets_target: float = 0.0  # fill the livrets up to this amount before anything else (0 = no buffer first)
+    expected_return_pct: float = 0.0  # yearly, applied to PEA, CTO and assurance-vie; 0 = contributions only
+    new_credit_monthly: float = 0.0  # new instalment purchases per month you expect to keep making
+    housing_delta: float = 0.0  # extra monthly housing cost compared with today (flat share, bigger room...)
+    # Sale of the rented flat
+    sale_date: datetime.date | None = datetime.date(2029, 12, 1)
+    sale_price: float | None = None  # None = use the market value, else the purchase price
+    sale_agent_fee_pct: float = 5.0
+    # Purchase of a home in Aix
+    purchase_date: datetime.date | None = datetime.date(2030, 1, 1)
+    purchase_price: float | None = None  # None = only show what is affordable
+    purchase_savings_share_pct: float = 50.0  # share of PEA + CTO + livrets used as down payment
+    loan_rate_pct: float = 3.6
+    loan_years: int = 25
+    loan_insurance_pct: float = 0.30  # yearly, on the borrowed capital
+    notary_fees_pct: float = 7.5  # 7-8 % for an old home, about 3 % for a new one
+    rent_weight_pct: float = 70.0  # share of rents a bank counts as income
+    max_debt_ratio_pct: float = 35.0
+
+
 class Document(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     account_id: int | None = Field(default=None, foreign_key="account.id")

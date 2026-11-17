@@ -357,7 +357,38 @@ export interface IncomeData {
   net_share_of_gross: number
 }
 
+export interface PlanSettingsData {
+  split_pea: number; split_cto: number; split_livrets: number; av_monthly: number; livrets_target: number; expected_return_pct: number
+  new_credit_monthly: number; housing_delta: number; sale_date: string | null; sale_price: number | null; sale_agent_fee_pct: number
+  purchase_date: string | null; purchase_price: number | null; purchase_savings_share_pct: number; loan_rate_pct: number; loan_years: number
+  loan_insurance_pct: number; notary_fees_pct: number; rent_weight_pct: number; max_debt_ratio_pct: number
+}
+
+export interface PlanAffordability {
+  sells_flat: boolean; bank_income: number; existing_debt_payments: number; max_total_payment: number; room_for_new_loan: number
+  capital_max: number; down_payment: number; price_max: number
+  grid: { price: number; capital: number; payment: number; ratio: number | null; feasible: boolean }[]
+}
+
+export interface PlanData {
+  settings: PlanSettingsData
+  context: { salary_net: number; rent_net: number; flat_costs: number; core_spending: number; housing_cost: number; checking: number; balances: Record<string, number>; essential_typical: number }
+  property_name: string | null
+  projection: { month: string; income: number; spending: number; debt_service: number; av: number; surplus: number; invested: number; cash: number
+    pea: number; cto: number; av_balance: number; livrets: number; sale_pot: number; total: number; events: { type: string; amount: number }[] }[]
+  milestones: { first_surplus_month: string | null; overdraft_cleared_month: string | null; steady_surplus: number | null
+    savings_2027_12: number | null; savings_2028_12: number | null; savings_2029_06: number | null; savings_end: number | null }
+  housing_scenarios: { delta: number; monthly_cost: number; surplus_next_month: number; surplus_2027_09: number | null; savings_end_2028: number | null }[]
+  sale: { date: string; price: number; price_basis: string; agent_fee: number; loan_balance: number; indemnity: number; gain_tax: number; net_proceeds: number } | null
+  purchase: { date: string; savings_pool: number; keep_flat: PlanAffordability; sell_flat: PlanAffordability }
+  split_check: number
+}
+
 export const api = {
+  plan: {
+    get: () => request<PlanData>('/plan'),
+    update: (payload: Partial<PlanSettingsData> & { clear_sale_price?: boolean; clear_purchase_price?: boolean }) => request<unknown>('/plan/settings', json('PATCH', payload)),
+  },
   wealth: {
     get: () => request<WealthData>('/wealth'),
     snapshot: (accountId: number, day: string, balance: number) =>
