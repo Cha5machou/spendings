@@ -113,7 +113,7 @@ def insights(months: int = 12, session: Session = Depends(get_session)):
 
     current_month = month_of(today)
     complete = sorted({month_of(t.date) for t in all_transactions if month_of(t.date) < current_month})
-    window = month_range(complete[-months], complete[-1]) if complete else []
+    window = month_range(complete[-months:][0], complete[-1]) if complete else []
     window_set = set(window)
     month_count = max(len(window), 1)
 
