@@ -130,3 +130,26 @@ td.amount, th.amount { text-align: right; font-variant-numeric: tabular-nums; wh
 .chip.active { border-color: var(--accent); background: var(--surface); font-weight: 600; }
 .chip .dot { width: 8px; height: 8px; margin-right: 4px; }
 tr.editing td { background: var(--bg); }
+
+/* Analysis page */
+.severity { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 10px; margin-right: 8px; border: 1px solid currentColor; }
+.severity.high { color: var(--negative); }
+.severity.medium { color: var(--expense); }
+.severity.low { color: var(--text-secondary); }
+.severity.info { color: var(--accent); }
+.reco { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 10px 0; border-top: 1px solid var(--border); }
+.reco:first-of-type { border-top: 0; }
+.reco .title { font-weight: 600; }
+.reco .impact { text-align: right; white-space: nowrap; color: var(--positive); font-weight: 600; }
+.stack { display: flex; height: 14px; border-radius: 6px; overflow: hidden; background: var(--bg); }
+.stack > div { height: 100%; }
+.matrix { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 12px; }
+.matrix th { font-weight: 500; color: var(--text-secondary); text-align: right; padding: 2px 4px; white-space: nowrap; }
+.matrix th:first-child, .matrix td:first-child { text-align: left; }
+.matrix td { text-align: right; padding: 4px; border-radius: 4px; font-variant-numeric: tabular-nums; }
+.matrix td.cell { cursor: pointer; min-width: 44px; }
+.matrix td.cell:hover { outline: 1px solid var(--accent); }
+.matrix tr.selected td:first-child { font-weight: 700; }
+.matrix tr.group td { padding-top: 10px; color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.matrix .name { cursor: pointer; white-space: nowrap; max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.scroll-x { overflow-x: auto; }

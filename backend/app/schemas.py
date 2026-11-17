@@ -30,6 +30,7 @@ class CategoryCreate(BaseModel):
     kind: CategoryKind = CategoryKind.expense
     parent_id: int | None = None
     color: str | None = None
+    necessity: str | None = None
 
 
 class CategoryUpdate(BaseModel):
@@ -37,6 +38,7 @@ class CategoryUpdate(BaseModel):
     kind: CategoryKind | None = None
     parent_id: int | None = None
     color: str | None = None
+    necessity: str | None = None
 
 
 class RuleCreate(BaseModel):

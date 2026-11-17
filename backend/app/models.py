@@ -56,6 +56,8 @@ class Category(SQLModel, table=True):
     parent_id: int | None = Field(default=None, foreign_key="category.id")
     color: str | None = None
     is_default: bool = False  # seeded categories, kept generic for any user
+    # "essential" (hard to cut: housing, debt, food...) or "flexible" (discretionary). None = unclassified.
+    necessity: str | None = None
 
 
 class CategoryRule(SQLModel, table=True):

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, type CategoryKind } from '../api'
+import { api, type Category, type CategoryKind } from '../api'
 import { useLoad } from '../hooks'
 
 const KINDS: { value: CategoryKind; label: string; hint: string }[] = [
@@ -60,6 +60,13 @@ export default function CategoriesPage() {
                 <div key={category.id} className="inline-form" style={{ padding: '3px 0' }}>
                   <span className="dot" style={{ background: category.color ?? 'var(--text-muted)' }} />
                   <span style={{ flex: 1 }}>{category.name}</span>
+                  {category.kind === 'expense' && (
+                    <select value={category.necessity ?? ''} title="Essential spending is hard to cut; flexible is discretionary" onChange={async (event) => { await api.categories.update(category.id, { necessity: (event.target.value || null) as Category['necessity'] }); categories.reload() }}>
+                      <option value="">unclassified</option>
+                      <option value="essential">essential</option>
+                      <option value="flexible">flexible</option>
+                    </select>
+                  )}
                   <span className="small muted">{rules.data?.filter((rule) => rule.category_id === category.id).length ?? 0} rules</span>
                   <button className="danger small" onClick={async () => { await api.categories.remove(category.id); categories.reload(); rules.reload() }} title="Transactions in this category become uncategorized">×</button>
                 </div>

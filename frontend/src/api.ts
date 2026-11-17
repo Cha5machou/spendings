@@ -26,6 +26,7 @@ export interface Category {
   parent_id: number | null
   color: string | null
   is_default: boolean
+  necessity: 'essential' | 'flexible' | null
 }
 
 export interface CategoryRule {
@@ -147,7 +148,76 @@ function query(params: Record<string, string | number | boolean | undefined | nu
   return encoded ? `?${encoded}` : ''
 }
 
+export interface InsightCategory {
+  category_id: number | null
+  name: string
+  kind: CategoryKind
+  color: string | null
+  necessity: 'essential' | 'flexible' | null
+  series: number[]
+  total: number
+  average: number
+  median: number
+  recent_average: number
+  earlier_average: number
+  last_month: number
+  current_month: number
+  one_off_total: number
+  transactions: number
+  months_present: number
+  pattern: 'fixed' | 'recurring' | 'occasional'
+  share: number | null
+  top_merchants: { name: string; total: number; count: number; last: string | null }[]
+}
+
+export interface Recommendation {
+  key: string
+  severity: 'high' | 'medium' | 'low' | 'info'
+  title: string
+  detail: string
+  monthly_impact: number | null
+  category_id: number | null
+  saving: boolean
+}
+
+export interface InsightsData {
+  empty: boolean
+  overview: {
+    window_start: string | null
+    window_end: string | null
+    months: number
+    typical_income: number
+    typical_spending: number
+    average_spending_with_one_offs: number
+    typical_saved_or_invested: number
+    typical_surplus: number
+    savings_rate: number | null
+    essential_spending: number
+    flexible_spending: number
+    unclassified_spending: number
+    one_off_total: number
+    income_one_off_total: number
+    uncategorized_transactions: number
+  }
+  potential_monthly_savings: number
+  months: { month: string; income: number; spending: number; saved: number; one_offs: number; income_one_offs: number; partial: boolean }[]
+  categories: InsightCategory[]
+  recurring: {
+    name: string; category_id: number | null; category_name: string; monthly_amount: number; yearly_cost: number
+    fixed_amount: boolean; months_seen: number; first_month: string; last_month: string; active: boolean; example_label: string
+  }[]
+  overdraft: {
+    account_id: number; account_name: string; overdraft_limit: number; days_tracked: number; days_negative: number
+    days_beyond_limit: number; lowest_balance: number | null; lowest_balance_date: string | null
+    by_month: { month: string; days_negative: number; lowest_balance: number | null }[]
+  }[]
+  recommendations: Recommendation[]
+  one_offs: { id: number; date: string; label: string; amount: number; category_name: string }[]
+}
+
 export const api = {
+  insights: (months = 12) => request<InsightsData>(`/insights?months=${months}`),
+
   health: () => request<Health>('/health'),
 
   accounts: {

@@ -34,6 +34,15 @@ DEFAULT_CATEGORIES: list[tuple[str, CategoryKind, str]] = [
     ("Internal transfer", CategoryKind.transfer, "#aaaaaa"),
 ]
 
+ESSENTIAL_CATEGORIES = {
+    "Housing (rent & charges)", "Mortgage", "Loans & credits", "Property (rented out)", "Groceries", "Fuel",
+    "Transport", "Utilities (energy, water, internet, phone)", "Insurance", "Taxes", "Health", "Bank fees",
+}
+FLEXIBLE_CATEGORIES = {
+    "Restaurants & bars", "Subscriptions", "Shopping", "Leisure & travel", "Cash withdrawal", "Other expense",
+    "Business (own company)", "Donations", "Family & friends",
+}
+
 DEFAULT_RULES: list[tuple[str, str]] = [
     # (pattern, category name) - case-insensitive "contains"
     ("carrefour", "Groceries"),
@@ -82,9 +91,23 @@ DEFAULT_RULES: list[tuple[str, str]] = [
 ]
 
 
+def backfill_necessity(session: Session) -> None:
+    """Classify known category names as essential / flexible once; never overrides a user's choice."""
+    for category in session.exec(select(Category).where(Category.necessity == None)).all():  # noqa: E711
+        if category.kind != CategoryKind.expense:
+            continue
+        if category.name in ESSENTIAL_CATEGORIES:
+            category.necessity = "essential"
+        elif category.name in FLEXIBLE_CATEGORIES:
+            category.necessity = "flexible"
+        session.add(category)
+    session.commit()
+
+
 def seed_defaults(session: Session) -> None:
     existing = session.exec(select(Category)).first()
     if existing is not None:
+        backfill_necessity(session)
         return
     categories_by_name: dict[str, Category] = {}
     for name, kind, color in DEFAULT_CATEGORIES:
@@ -95,3 +118,4 @@ def seed_defaults(session: Session) -> None:
     for pattern, category_name in DEFAULT_RULES:
         session.add(CategoryRule(category_id=categories_by_name[category_name].id, pattern=pattern))
     session.commit()
+    backfill_necessity(session)

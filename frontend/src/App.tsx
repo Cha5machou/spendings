@@ -4,9 +4,11 @@ import TransactionsPage from './pages/TransactionsPage'
 import DocumentsPage from './pages/DocumentsPage'
 import AccountsPage from './pages/AccountsPage'
 import CategoriesPage from './pages/CategoriesPage'
+import InsightsPage from './pages/InsightsPage'
 
 const links = [
   { to: '/', label: 'Dashboard' },
+  { to: '/insights', label: 'Analysis' },
   { to: '/transactions', label: 'Transactions' },
   { to: '/documents', label: 'Documents' },
   { to: '/accounts', label: 'Accounts' },
@@ -30,6 +32,7 @@ export default function App() {
         <main className="content">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
