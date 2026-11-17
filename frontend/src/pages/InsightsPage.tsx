@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, formatMoney, type InsightCategory } from '../api'
+import MoneyFlow from '../components/MoneyFlow'
 import { useLoad } from '../hooks'
 
 const axisTick = { fill: 'var(--text-secondary)', fontSize: 12 }
@@ -25,6 +26,8 @@ export default function InsightsPage() {
   const [showEnded, setShowEnded] = useState(false)
   const navigate = useNavigate()
   const insights = useLoad(() => api.insights(months), [months])
+  const [withOneOffs, setWithOneOffs] = useState(false)
+  const flows = useLoad(() => api.flows(months, withOneOffs), [months, withOneOffs])
   const data = insights.data
 
   function openTransactions(category: InsightCategory, month?: string) {
@@ -72,6 +75,31 @@ export default function InsightsPage() {
         <span className="small muted">
           {overview.months} complete months, {monthLabel(overview.window_start!)} to {monthLabel(overview.window_end!)}. The current month is shown separately.
         </span>
+      </div>
+
+      <div className="card">
+        <div className="toolbar">
+          <h2 style={{ margin: 0 }}>Where your money goes</h2>
+          <span className="spacer" />
+          <label className="small"><input type="checkbox" checked={withOneOffs} onChange={(event) => setWithOneOffs(event.target.checked)} /> include one-off items</label>
+        </div>
+        <p className="small muted">Monthly average over the period selected above. Read it from left to right: where the money comes from, then where it goes. The width of each band is the amount.</p>
+        {flows.data && !flows.data.empty && (
+          <>
+            <MoneyFlow data={flows.data} />
+            <p style={{ marginTop: 8 }}>
+              Out of every <strong>100 €</strong> that comes in:{' '}
+              {Object.entries(flows.data.totals.shares).sort((a, b) => b[1] - a[1]).map(([group, share], index, all) => (
+                <span key={group}><strong>{Math.round(share * 100)} €</strong> go to {group.toLowerCase()}{index < all.length - 1 ? ', ' : '.'}</span>
+              ))}
+            </p>
+            {flows.data.totals.shortfall > 0 && (
+              <p className="small negative">
+                You spend {euros(flows.data.totals.shortfall)} a month more than you earn. The "Shortfall" band is that gap: it is covered by the overdraft, by withdrawals from savings or by new credit.
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       <div className="grid cols-4">

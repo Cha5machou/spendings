@@ -422,6 +422,16 @@ export interface ChatMessage {
   content: string
 }
 
+export interface FlowsData {
+  empty: boolean
+  months: number
+  window: [string | null, string | null]
+  include_one_offs: boolean
+  nodes: { name: string; color: string; group: string }[]
+  links: { source: number; target: number; value: number }[]
+  totals: { money_in: number; from_income: number; shortfall: number; left_over: number; groups: Record<string, number>; shares: Record<string, number> }
+}
+
 export interface ScheduledPayment {
   id: number
   label: string
@@ -431,6 +441,7 @@ export interface ScheduledPayment {
 }
 
 export const api = {
+  flows: (months: number, includeOneOffs: boolean) => request<FlowsData>(`/flows?months=${months}&include_one_offs=${includeOneOffs}`),
   scheduled: {
     list: () => request<ScheduledPayment[]>('/scheduled'),
     create: (payload: { label: string; date: string; amount: number; notes?: string | null }) => request<ScheduledPayment>('/scheduled', json('POST', payload)),
