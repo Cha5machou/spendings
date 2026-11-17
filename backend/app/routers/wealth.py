@@ -173,8 +173,8 @@ def wealth(session: Session = Depends(get_session)):
                 "severity": "high" if covered < 1 else "medium",
                 "title": f"Emergency cash covers {covered:.1f} months of essential spending",
                 "detail": f"Livret A and LDDS hold {euro(cash_savings)}. Essential spending is about {euro(essential)} a month (housing, debt, food, insurance), so the usual target is {euro(low)} to {euro(high)}. "
-                          "Your PEA is locked in practice (withdrawing can close it) and the assurance-vie takes days and tax on gains, so neither is a real buffer. "
-                          "Both current accounts are also overdrawn today.",
+                          "A PEA is locked in practice (withdrawing early can close it) and an assurance-vie takes days and tax on gains, so neither is a real buffer."
+                          + (" Your current accounts are also overdrawn today." if any(balance is not None and balance < 0 for _, balance in checking) else ""),
             })
     if history:
         peak = max(history, key=lambda entry: entry["total"])
@@ -215,7 +215,7 @@ def wealth(session: Session = Depends(get_session)):
             checks.append({
                 "severity": "low",
                 "title": f"Individual stocks are {share:.0%} of your market investments",
-                "detail": f"{len(single_stocks)} companies, {euro(sum(h.value for h in single_stocks))}. Fine as a satellite next to the index funds; mind that each Trade Republic plan buys small amounts of many separate assets, which adds up to many lines to follow.",
+                "detail": f"{len(single_stocks)} companies, {euro(sum(h.value for h in single_stocks))}. Fine as a satellite next to the index funds; many small separate positions are also harder to follow.",
             })
     severity_order = {"high": 0, "medium": 1, "low": 2, "info": 3}
     checks.sort(key=lambda item: severity_order[item["severity"]])

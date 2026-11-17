@@ -363,10 +363,37 @@ export interface IncomeData {
 }
 
 export interface PlanSettingsData {
+  skipped_loans: boolean; skipped_property: boolean
   split_pea: number; split_cto: number; split_livrets: number; av_monthly: number; livrets_target: number; expected_return_pct: number
   new_credit_monthly: number; housing_delta: number; sale_date: string | null; sale_price: number | null; sale_agent_fee_pct: number
   purchase_date: string | null; purchase_price: number | null; purchase_savings_share_pct: number; loan_rate_pct: number; loan_years: number
   loan_insurance_pct: number; notary_fees_pct: number; rent_weight_pct: number; max_debt_ratio_pct: number
+}
+
+export type GoalKind = 'savings' | 'emergency_fund' | 'home_purchase' | 'property_sale' | 'housing_change' | 'retirement' | 'other'
+
+export interface Goal {
+  id: number
+  title: string
+  kind: GoalKind
+  target_amount: number | null
+  target_date: string | null
+  funded_by: 'livrets' | 'pea' | 'cto' | 'av' | 'any'
+  priority: 1 | 2 | 3
+  notes: string | null
+}
+
+export interface GoalWithProgress extends Goal {
+  horizon: 'short' | 'medium' | 'long' | 'none'
+  months_away: number | null
+  progress: { projected_at_date: number; on_track: boolean; gap: number; reached_month: string | null; start: number; beyond_projection: boolean } | null
+}
+
+export interface SetupStatus {
+  steps: { key: string; title: string; route: string; required: boolean; done: boolean; detail: string }[]
+  complete: boolean
+  next: string | null
+  counts: Record<string, number>
 }
 
 export interface PlanAffordability {
@@ -382,10 +409,11 @@ export interface PlanData {
   projection: { month: string; income: number; spending: number; debt_service: number; av: number; surplus: number; invested: number; cash: number
     pea: number; cto: number; av_balance: number; livrets: number; sale_pot: number; total: number; events: { type: string; amount: number }[] }[]
   milestones: { first_surplus_month: string | null; overdraft_cleared_month: string | null; steady_surplus: number | null
-    savings_2027_12: number | null; savings_2028_12: number | null; savings_2029_06: number | null; savings_end: number | null }
-  housing_scenarios: { delta: number; monthly_cost: number; surplus_next_month: number; surplus_2027_09: number | null; savings_end_2028: number | null }[]
+    savings_in_12_months: number | null; savings_in_24_months: number | null; savings_in_36_months: number | null; savings_end: number | null; end_month: string | null }
+  housing_scenarios: { delta: number; monthly_cost: number; surplus_next_month: number; surplus_in_12_months: number | null; savings_in_24_months: number | null }[]
   sale: { date: string; price: number; price_basis: string; agent_fee: number; loan_balance: number; indemnity: number; gain_tax: number; net_proceeds: number } | null
-  purchase: { date: string; savings_pool: number; keep_flat: PlanAffordability; sell_flat: PlanAffordability }
+  purchase: { date: string; savings_pool: number; keep_flat: PlanAffordability | null; sell_flat: PlanAffordability | null; without_flat: PlanAffordability | null } | null
+  goals: GoalWithProgress[]
   split_check: number
 }
 
@@ -395,13 +423,20 @@ export interface ChatMessage {
 }
 
 export const api = {
+  setup: { get: () => request<SetupStatus>('/setup') },
+  goals: {
+    list: () => request<Goal[]>('/goals'),
+    create: (payload: Partial<Goal>) => request<Goal>('/goals', json('POST', payload)),
+    update: (id: number, payload: Partial<Goal>) => request<Goal>(`/goals/${id}`, json('PATCH', payload)),
+    remove: (id: number) => request<void>(`/goals/${id}`, { method: 'DELETE' }),
+  },
   assistant: {
     ask: (messages: ChatMessage[]) =>
       request<{ answer: string; tools_used: string[]; usage: { input_tokens: number; output_tokens: number } }>('/assistant', json('POST', { messages })),
   },
   plan: {
     get: () => request<PlanData>('/plan'),
-    update: (payload: Partial<PlanSettingsData> & { clear_sale_price?: boolean; clear_purchase_price?: boolean }) => request<unknown>('/plan/settings', json('PATCH', payload)),
+    update: (payload: Partial<Record<keyof PlanSettingsData, number | string | boolean | null>>) => request<unknown>('/plan/settings', json('PATCH', payload)),
   },
   wealth: {
     get: () => request<WealthData>('/wealth'),
@@ -410,6 +445,9 @@ export const api = {
   },
   income: {
     get: () => request<IncomeData>('/income'),
+    addManual: (payload: { month: string; gross: number; net_before_tax: number; tax_rate: number; net_paid: number }) =>
+      request<{ ok: boolean }>('/income/payslips/manual', json('POST', payload)),
+    removePayslip: (month: string) => request<void>(`/income/payslips/${month}`, { method: 'DELETE' }),
     uploadPayslips: (files: FileList) => {
       const form = new FormData()
       for (const file of Array.from(files)) form.append('files', file)
@@ -418,6 +456,7 @@ export const api = {
   },
   properties: {
     list: () => request<PropertyData[]>('/properties'),
+    create: (payload: Record<string, unknown>) => request<unknown>('/properties', json('POST', payload)),
     update: (id: number, payload: Partial<PropertyData>) => request<PropertyData>(`/properties/${id}`, json('PATCH', payload)),
     sale: (id: number, price: number, agentFeePercent: number) => request<SaleScenario>(`/properties/${id}/sale?price=${price}&agent_fee_percent=${agentFeePercent}`),
   },

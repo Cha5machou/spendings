@@ -187,25 +187,42 @@ class Payslip(SQLModel, table=True):
     bonus: float | None = None
 
 
+class Goal(SQLModel, table=True):
+    """A goal the user defines. Progress is measured against the plan's projection."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    title: str
+    kind: str = "savings"  # savings, emergency_fund, home_purchase, property_sale, housing_change, retirement, other
+    target_amount: float | None = None
+    target_date: datetime.date | None = None
+    funded_by: str = "any"  # livrets, pea, cto, av or any (all savings buckets)
+    priority: int = 2  # 1 high, 2 normal, 3 low
+    notes: str | None = None
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+
 class PlanSettings(SQLModel, table=True):
     """The user's planning assumptions (a single row, id = 1)."""
 
     id: int | None = Field(default=1, primary_key=True)
+    # Onboarding: the user states they have none, so the setup checklist does not nag.
+    skipped_loans: bool = False
+    skipped_property: bool = False
     # Where monthly savings go, percent of what is left after everything else (AV is a fixed plan on top).
     split_pea: float = 50.0
     split_cto: float = 30.0
     split_livrets: float = 20.0
-    av_monthly: float = 100.0
+    av_monthly: float = 0.0  # fixed monthly contribution to an assurance-vie or similar plan
     livrets_target: float = 0.0  # fill the livrets up to this amount before anything else (0 = no buffer first)
     expected_return_pct: float = 0.0  # yearly, applied to PEA, CTO and assurance-vie; 0 = contributions only
     new_credit_monthly: float = 0.0  # new instalment purchases per month you expect to keep making
     housing_delta: float = 0.0  # extra monthly housing cost compared with today (flat share, bigger room...)
     # Sale of the rented flat
-    sale_date: datetime.date | None = datetime.date(2029, 12, 1)
+    sale_date: datetime.date | None = None  # set it to model selling the rented property
     sale_price: float | None = None  # None = use the market value, else the purchase price
     sale_agent_fee_pct: float = 5.0
     # Purchase of a home in Aix
-    purchase_date: datetime.date | None = datetime.date(2030, 1, 1)
+    purchase_date: datetime.date | None = None  # set it to model buying a home
     purchase_price: float | None = None  # None = only show what is affordable
     purchase_savings_share_pct: float = 50.0  # share of PEA + CTO + livrets used as down payment
     loan_rate_pct: float = 3.6

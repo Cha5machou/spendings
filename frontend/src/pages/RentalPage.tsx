@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import HelpBox from '../components/HelpBox'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, formatDate, formatMoney, type PropertyData, type SaleScenario } from '../api'
@@ -186,6 +187,77 @@ function PropertyCard({ property, onChanged }: { property: PropertyData; onChang
   )
 }
 
+function NewPropertyForm({ onCreated }: { onCreated: () => void }) {
+  const categories = useLoad(() => api.categories.list())
+  const loans = useLoad(() => api.loans.list())
+  const [form, setForm] = useState<Record<string, string>>({ furnished: 'no' })
+  const [error, setError] = useState<string | null>(null)
+  const pick = (kind: string, word: string) => categories.data?.find((category) => category.kind === kind && category.name.toLowerCase().includes(word))?.id
+  const value = (key: string, fallback = '') => form[key] ?? fallback
+  const set = (key: string, text: string) => setForm({ ...form, [key]: text })
+  const number = (key: string) => (form[key] && form[key] !== '' ? Number(form[key].replace(',', '.')) : undefined)
+  const input = (key: string, label: string, placeholder = '') => (
+    <label className="small" key={key}>{label}<br /><input style={{ width: '100%' }} placeholder={placeholder} value={value(key)} onChange={(event) => set(key, event.target.value)} /></label>
+  )
+  const categorySelect = (key: string, label: string, kind: string, word: string) => (
+    <label className="small" key={key}>{label}<br />
+      <select style={{ width: '100%' }} value={value(key, String(pick(kind, word) ?? ''))} onChange={(event) => set(key, event.target.value)}>
+        <option value="">none</option>
+        {categories.data?.filter((category) => category.kind === kind).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+      </select>
+    </label>
+  )
+
+  async function create() {
+    setError(null)
+    try {
+      if (!value('name').trim()) throw new Error('Give the property a name')
+      const loanId = value('loan_id')
+      await api.properties.create({
+        name: value('name').trim(), address: value('address') || null, furnished: value('furnished') === 'yes', surface_m2: number('surface_m2'),
+        purchase_price: number('purchase_price'), purchase_date: value('purchase_date') || null,
+        monthly_rent: number('monthly_rent') ?? 0, monthly_charges: number('monthly_charges') ?? 0, lease_start: value('lease_start') || null,
+        agency: value('agency') || null, management_fee_rate: number('management_fee_rate') ?? 0, rent_insurance_rate: number('rent_insurance_rate') ?? 0,
+        syndic_quarterly: number('syndic_quarterly') ?? 0, property_tax_yearly: number('property_tax_yearly') ?? 0,
+        loan_id: loanId ? Number(loanId) : null,
+        income_category_id: Number(value('income_category_id', String(pick('income', 'rent') ?? ''))) || null,
+        cost_category_id: Number(value('cost_category_id', String(pick('expense', 'property') ?? ''))) || null,
+        mortgage_category_id: Number(value('mortgage_category_id', String(pick('expense', 'mortgage') ?? ''))) || null,
+      })
+      onCreated()
+    } catch (createError) {
+      setError((createError as Error).message)
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>Add a rented property</h2>
+      {error && <div className="alert error">{error}</div>}
+      <div className="grid cols-2">
+        {input('name', 'Name', 'Flat B42, Lyon')}{input('address', 'Address (optional)')}
+        {input('monthly_rent', 'Rent per month, excl. charges (€)')}{input('monthly_charges', 'Charge provisions paid by the tenant (€)')}
+        {input('purchase_price', 'Purchase price (€)')}{input('purchase_date', 'Purchase date', '2023-10-27')}
+        {input('lease_start', 'Lease start', '2026-06-12')}{input('surface_m2', 'Surface (m²)')}
+        {input('management_fee_rate', 'Agency fee (% incl. VAT of rent + charges)', '6')}{input('rent_insurance_rate', 'Guaranteed-rent insurance (%)', '3')}
+        {input('syndic_quarterly', 'Co-ownership call per quarter (€)')}{input('property_tax_yearly', 'Property tax per year (€)')}
+        <label className="small">Furnished<br /><select value={value('furnished', 'no')} onChange={(event) => set('furnished', event.target.value)}><option value="no">no</option><option value="yes">yes</option></select></label>
+        <label className="small">Mortgage (from Credits &amp; loans)<br />
+          <select style={{ width: '100%' }} value={value('loan_id')} onChange={(event) => set('loan_id', event.target.value)}>
+            <option value="">none</option>
+            {loans.data?.loans.map((loan) => <option key={loan.id} value={loan.id}>{loan.name}</option>)}
+          </select>
+        </label>
+        {categorySelect('income_category_id', 'Category where the rent arrives', 'income', 'rent')}
+        {categorySelect('cost_category_id', 'Category for its costs (co-ownership, tax…)', 'expense', 'property')}
+        {categorySelect('mortgage_category_id', 'Category of the mortgage payments', 'expense', 'mortgage')}
+      </div>
+      <p className="small muted">The categories tell the app which transactions belong to this property, so its real cash flow can be computed. You can edit all of this later.</p>
+      <button className="primary" onClick={create}>Add property</button>
+    </div>
+  )
+}
+
 export default function RentalPage() {
   const properties = useLoad(() => api.properties.list())
   if (properties.error) return <div className="alert error">{properties.error}</div>
@@ -193,7 +265,16 @@ export default function RentalPage() {
   return (
     <div>
       <h1>Rental property</h1>
-      {properties.data.length === 0 && <div className="card"><p>No property yet.</p></div>}
+      <HelpBox title="What is this page for?" open={properties.data.length === 0}>
+        If you rent a property out, add it here with its lease terms and agency fees. The app then shows what it really costs or earns each month once the mortgage, agency fee, co-ownership and tax are counted, and models a sale.
+        If you do not rent anything out, mark this step as skipped.
+      </HelpBox>
+      {properties.data.length === 0 && (
+        <>
+          <NewPropertyForm onCreated={properties.reload} />
+          <button onClick={async () => { await api.plan.update({ skipped_property: true }); properties.reload() }}>I do not rent out a property</button>
+        </>
+      )}
       {properties.data.map((property) => <PropertyCard key={property.id} property={property} onChanged={properties.reload} />)}
     </div>
   )

@@ -5,9 +5,9 @@ import { useLoad } from '../hooks'
 const SUGGESTIONS = [
   'Where could I realistically cut 200 euros a month?',
   'Summarise my last month in five lines.',
-  'What if I pay 200 euros more for housing and buy in Aix at 300000 in January 2030?',
+  'What if my housing cost goes up by 200 euros a month?',
   'Which of my credits should I pay off first, and what would it save?',
-  'How much does the Saint-Cyr flat really cost me each month?',
+  'Am I on track for my goals?',
 ]
 
 const TOOL_LABEL: Record<string, string> = {

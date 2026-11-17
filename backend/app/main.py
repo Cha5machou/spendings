@@ -10,7 +10,7 @@ from app.auth import require_user
 from app.config import settings
 from app.database import create_tables, engine
 from app.extraction import claude_extractor
-from app.routers import accounts, assistant, categories, dashboard, documents, income, insights, loans, plan, properties, transactions, wealth
+from app.routers import accounts, assistant, categories, dashboard, documents, goals, income, insights, loans, plan, properties, setup, transactions, wealth
 from app.seed import seed_defaults
 
 
@@ -32,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for router in (accounts.router, categories.router, documents.router, transactions.router, dashboard.router, insights.router, loans.router, properties.router, wealth.router, income.router, plan.router, assistant.router):
+for router in (accounts.router, categories.router, documents.router, transactions.router, dashboard.router, insights.router, loans.router, properties.router, wealth.router, income.router, plan.router, assistant.router, goals.router, setup.router):
     app.include_router(router, prefix="/api", dependencies=[Depends(require_user)])
 
 

@@ -1,6 +1,7 @@
 """Salary from payslips: what is earned, taxed and kept, plus the tax bracket that drives retirement-saving advice."""
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.database import get_session
@@ -39,6 +40,42 @@ async def upload_payslips(files: list[UploadFile], session: Session = Depends(ge
         imported.append(parsed.month)
     session.commit()
     return {"imported": sorted(imported), "failed": failed}
+
+
+class PayslipPayload(BaseModel):
+    month: str  # YYYY-MM
+    gross: float
+    net_before_tax: float
+    tax_rate: float = 0.0  # withholding rate, percent
+    net_paid: float
+    employer: str | None = None
+    bonus: float | None = None
+
+
+@router.post("/payslips/manual", status_code=201)
+def add_payslip_manually(payload: PayslipPayload, session: Session = Depends(get_session)):
+    """For payslips the PDF reader cannot handle: type the four numbers instead."""
+    import re
+
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", payload.month):
+        raise HTTPException(422, "month must look like 2026-03")
+    payslip = session.exec(select(Payslip).where(Payslip.month == payload.month)).first() or Payslip(month=payload.month)
+    payslip.gross, payslip.net_before_tax, payslip.net_paid = payload.gross, payload.net_before_tax, payload.net_paid
+    payslip.tax_rate, payslip.employer, payslip.bonus = payload.tax_rate, payload.employer, payload.bonus
+    payslip.tax_withheld = round(max(payload.net_before_tax - payload.net_paid, 0.0), 2)
+    payslip.taxable_net = payload.net_before_tax
+    session.add(payslip)
+    session.commit()
+    return {"ok": True}
+
+
+@router.delete("/payslips/{month}", status_code=204)
+def delete_payslip(month: str, session: Session = Depends(get_session)):
+    payslip = session.exec(select(Payslip).where(Payslip.month == month)).first()
+    if payslip is None:
+        raise HTTPException(404, "Payslip not found")
+    session.delete(payslip)
+    session.commit()
 
 
 @router.get("")

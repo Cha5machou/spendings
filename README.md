@@ -51,17 +51,21 @@ API docs: http://localhost:8000/docs
 
 Categories have a *kind*: `expense`, `income`, `savings` (counted as saved, not spent) or `transfer` (between your own accounts, ignored in totals).
 
-Beyond the spending core, each part has its own page:
+The menu follows the order a newcomer should work in. **Get started** shows a checklist and where you are.
 
-| Page | What it does |
-|---|---|
-| Ask | Ask questions about your own numbers. Claude reads your data through read-only tools and can test what-ifs on the plan without saving them |
-| Goals & plan | Month-by-month projection of what is left, where savings go, flat-share rent scenarios, sale of a property and what a new purchase could reach |
-| Analysis | Typical month, category explorer, recurring payments, overdraft usage, computed recommendations |
-| Savings & net worth | Balances and history per account, positions, allocation, net worth, emergency-fund check |
-| Income | Payslips (PDF) parsed into gross, tax withheld and net; tax bracket and PER estimate |
-| Loans & credits | Balances and schedules (official amortisation table or computed), debt-service timeline, payoff planner, prepayment and renegotiation what-ifs |
-| Rental property | Real cash flow, lease economics after agency fees, checks, sale scenario |
+**1 · Set up**
+
+| Step | Page | What you do |
+|---|---|---|
+| 1 | Accounts | Add your current accounts, cards and savings accounts, with the authorised overdraft |
+| 2 | Payslips | Upload PDF payslips, or type them in; gives your real income, tax and bracket |
+| 3 | Credits & loans | Add each credit (or import the amortisation table of a loan offer); payoff planner and what-ifs |
+| 4 | Rental property | Only if you rent one out: lease terms, agency fees, real cash flow, sale scenario |
+| 5 | Bank statements | Upload PDF, CSV or Excel statements (an example file is provided) |
+| 6 | Transactions | Check categories month by month; each fix can become a rule |
+| 7 | Goals | Write your own goals and assumptions; the projection tells you whether they are on track |
+
+**2 · Analyse**: Dashboard (income, expenses, savings), Analysis (where the money goes, recurring payments, what to improve), Savings & net worth, and Ask (questions about your own numbers, answered by Claude from your data, read-only).
 
 ## Layout
 

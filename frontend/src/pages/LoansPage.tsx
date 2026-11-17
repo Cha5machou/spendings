@@ -1,3 +1,4 @@
+import HelpBox from '../components/HelpBox'
 import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, formatDate, formatMoney, type Loan, type LoanKind, type PayoffPlan, type WhatIf } from '../api'
@@ -143,7 +144,21 @@ export default function LoansPage() {
 
   return (
     <div>
-      <h1>Loans &amp; credits</h1>
+      <h1>Credits &amp; loans</h1>
+      <HelpBox title="Where do I find the numbers?" open={data.loans.length === 0}>
+        <ul>
+          <li>On your lender's website or in your loan contract: <strong>remaining capital</strong> (capital restant dû), <strong>rate</strong> (taux), the <strong>instalment</strong> including insurance, the <strong>next payment date</strong> and the <strong>end date</strong>.</li>
+          <li><strong>Instalment purchases</strong> (PayPal in 3 or 4 times, Cofidis, Klarna): add each purchase as its own credit, type <em>Pay-in-instalments</em>, rate 0, with the number of instalments left.</li>
+          <li>If you have the <strong>loan offer PDF with the amortisation table</strong>, open the credit with <em>Edit</em> and import it: the projection then follows the official schedule.</li>
+          <li>Update the balance whenever the lender gives you a new one; the projection restarts from it.</li>
+        </ul>
+      </HelpBox>
+      {data.loans.length === 0 && (
+        <div className="card">
+          <p>No credit yet. If you have none, that is fine:</p>
+          <button onClick={async () => { await api.plan.update({ skipped_loans: true }); loans.reload() }}>I have no credits or loans</button>
+        </div>
+      )}
       {error && <div className="alert error">{error}</div>}
       {message && <div className="alert success">{message}</div>}
 

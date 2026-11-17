@@ -1,3 +1,4 @@
+import HelpBox from '../components/HelpBox'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, formatDate, formatMoney, type Category, type Transaction } from '../api'
@@ -162,6 +163,14 @@ export default function TransactionsPage() {
   return (
     <div>
       <h1>Transactions</h1>
+      <HelpBox title="How to check and fix categories">
+        <ul>
+          <li>Each statement line is filed under a category by rules. Use <strong>Uncategorized only</strong> to see what is left, and pick a category from the list.</li>
+          <li>After you pick one, the app offers to <strong>create a rule</strong> so the same shop is filed automatically next time and for similar lines already imported.</li>
+          <li>Wrong amount or label? Use <strong>Edit</strong> on the line. Missing line? Use <strong>+ Add</strong>. Move between months with the arrows.</li>
+          <li>Transfers between your own accounts should be in the <em>Internal transfer</em> category so they do not count as spending.</li>
+        </ul>
+      </HelpBox>
       <div className="toolbar">
         <button onClick={() => shiftMonth(-1)}>‹</button>
         <strong style={{ minWidth: 130, textAlign: 'center' }}>{isWholeMonth ? monthLabel(start) : start || end ? `${start || '…'} → ${end || '…'}` : 'All dates'}</strong>

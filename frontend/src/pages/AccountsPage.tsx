@@ -1,3 +1,4 @@
+import HelpBox from '../components/HelpBox'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, formatDate, formatMoney, type Account, type AccountKind } from '../api'
@@ -64,6 +65,14 @@ export default function AccountsPage() {
   return (
     <div>
       <h1>Accounts</h1>
+      <HelpBox title="What to add here" open={(accounts.data?.length ?? 0) === 0}>
+        <ul>
+          <li><strong>One account per bank account or card</strong>: your current account first, then any other current account or credit card.</li>
+          <li><strong>Authorised overdraft</strong> (découvert autorisé): the amount in your bank agreement. It lets the app show how much room you really have.</li>
+          <li><strong>Savings and investments</strong> (Livret A, PEA, assurance-vie, brokerage): create them as <em>savings</em> or <em>investment</em> accounts. Their balances are recorded on the <a href="/wealth">Savings &amp; net worth</a> page.</li>
+          <li>Your bank statements are matched to an account when you upload them; the statement balance keeps the current balance up to date between uploads.</li>
+        </ul>
+      </HelpBox>
 
       <div className="grid cols-2">
         {accounts.data?.filter((account) => account.is_active).map((account) => {

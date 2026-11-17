@@ -12,7 +12,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.loans import add_months, annuity_payment, early_repayment_indemnity
-from app.models import AccountKind, Loan, LoanKind, PlanSettings, Property, Payslip
+from app.models import AccountKind, Goal, Loan, LoanKind, PlanSettings, Property, Payslip
 from app.routers.loans import load_all
 
 router = APIRouter(prefix="/plan", tags=["plan"])
@@ -25,6 +25,8 @@ CAPITAL_GAIN_TAX_RATE = 0.362
 
 
 class SettingsPayload(BaseModel):
+    skipped_loans: bool | None = None
+    skipped_property: bool | None = None
     split_pea: float | None = None
     split_cto: float | None = None
     split_livrets: float | None = None
@@ -56,6 +58,15 @@ def get_settings(session: Session) -> PlanSettings:
         session.add(settings)
         session.commit()
         session.refresh(settings)
+    # Columns added after the row was created come back empty: fill them with the defaults.
+    changed = False
+    for field in ("skipped_loans", "skipped_property"):
+        if getattr(settings, field) is None:
+            setattr(settings, field, False)
+            changed = True
+    if changed:
+        session.add(settings)
+        session.commit()
     return settings
 
 
@@ -154,11 +165,13 @@ def sale_outcome(context: dict, settings: PlanSettings) -> dict | None:
     }
 
 
-def project(context: dict, settings: PlanSettings, housing_delta: float) -> list[dict]:
+def project(context: dict, settings: PlanSettings, housing_delta: float, until: date | None = None) -> list[dict]:
     """Month-by-month cash flow and balances from next month until the end of 2030 (or later if needed)."""
     today = date.today()
     start = add_months(month_start(today), 1)
     end = HORIZON_END
+    if until and until > end:
+        end = month_start(until)
     for day in (settings.sale_date, settings.purchase_date):
         if day and day > end:
             end = add_months(month_start(day), 6)
@@ -265,35 +278,48 @@ def get_plan(session: Session = Depends(get_session)):
 def compute_plan(session: Session, settings: PlanSettings) -> dict:
     """The full plan for `settings` (stored or hypothetical); nothing is saved."""
     context = build_context(session)
-    rows = project(context, settings, settings.housing_delta)
+    latest_goal = session.exec(select(Goal.target_date).where(Goal.target_date.is_not(None)).order_by(Goal.target_date.desc())).first()
+    until = min(latest_goal, date(2060, 12, 1)) if latest_goal else None
+    rows = project(context, settings, settings.housing_delta, until)
 
-    def at_month(day: str, key: str = "total"):
-        row = next((r for r in rows if r["month"] == day), None)
-        return row[key] if row else None
+    def after(months: int, key: str = "total", source: list[dict] | None = None):
+        """Value `months` months after the first projected month (None if the projection is shorter)."""
+        source = rows if source is None else source
+        return source[months - 1][key] if len(source) >= months else None
 
     first_positive = next((r["month"] for r in rows if r["surplus"] > 0), None)
     first_cash_clear = next((r["month"] for r in rows if r["cash"] >= 0 and r["invested"] > 0), None)
-    steady = [r["surplus"] for r in rows if "2028-07" <= r["month"] <= "2029-06"]
+    # "Steady" month-to-month surplus: the second year of the projection (the first one still carries today's credits).
+    steady_window = rows[12:24] or rows[-12:]
+    steady = [r["surplus"] for r in steady_window]
 
     housing_scenarios = []
     for delta in sorted({*HOUSING_DELTAS, int(settings.housing_delta)}):
-        scenario_rows = project(context, settings, float(delta))
+        scenario_rows = project(context, settings, float(delta), until)
         housing_scenarios.append({
             "delta": delta, "monthly_cost": round(context["housing_cost"] + delta, 2),
             "surplus_next_month": scenario_rows[0]["surplus"],
-            "surplus_2027_09": next((r["surplus"] for r in scenario_rows if r["month"] == "2027-09"), None),
-            "savings_end_2028": next((r["total"] for r in scenario_rows if r["month"] == "2028-12"), None),
+            "surplus_in_12_months": after(12, "surplus", scenario_rows),
+            "savings_in_24_months": after(24, "total", scenario_rows),
         })
 
     sale = sale_outcome(context, settings)
-    buy_at = settings.purchase_date or date(2030, 1, 1)
-    pool_at_purchase = 0.0
-    purchase_month = buy_at.strftime("%Y-%m")
-    row_before = next((r for r in reversed(rows) if r["month"] < purchase_month), rows[-1])
-    pool_at_purchase = row_before["pea"] + row_before["cto"] + row_before["livrets"]
-    sale_net = sale["net_proceeds"] if sale else 0.0
-    keep = affordability(context, settings, buy_at, False, pool_at_purchase, 0.0)
-    sell = affordability(context, settings, buy_at, True, pool_at_purchase, sale_net)
+    purchase = None
+    if settings.purchase_date:
+        buy_at = settings.purchase_date
+        purchase_month = buy_at.strftime("%Y-%m")
+        row_before = next((r for r in reversed(rows) if r["month"] < purchase_month), rows[-1])
+        pool_at_purchase = row_before["pea"] + row_before["cto"] + row_before["livrets"]
+        sale_net = sale["net_proceeds"] if sale else 0.0
+        has_flat = bool(context["property"])
+        purchase = {
+            "date": buy_at.isoformat(), "savings_pool": round(pool_at_purchase, 2),
+            "keep_flat": affordability(context, settings, buy_at, False, pool_at_purchase, 0.0) if has_flat else None,
+            "sell_flat": affordability(context, settings, buy_at, True, pool_at_purchase, sale_net) if has_flat else None,
+            "without_flat": None if has_flat else affordability(context, settings, buy_at, False, pool_at_purchase, 0.0),
+        }
+
+    goals = goals_with_progress(session, rows)
 
     return {
         "settings": settings.model_dump(),
@@ -303,14 +329,46 @@ def compute_plan(session: Session, settings: PlanSettings) -> dict:
         "milestones": {
             "first_surplus_month": first_positive, "overdraft_cleared_month": first_cash_clear,
             "steady_surplus": round(sum(steady) / len(steady), 2) if steady else None,
-            "savings_2027_12": at_month("2027-12"), "savings_2028_12": at_month("2028-12"), "savings_2029_06": at_month("2029-06"),
-            "savings_end": rows[-1]["total"] if rows else None,
+            "savings_in_12_months": after(12), "savings_in_24_months": after(24), "savings_in_36_months": after(36),
+            "savings_end": rows[-1]["total"] if rows else None, "end_month": rows[-1]["month"] if rows else None,
         },
         "housing_scenarios": housing_scenarios,
         "sale": sale,
-        "purchase": {"date": buy_at.isoformat(), "savings_pool": round(pool_at_purchase, 2), "keep_flat": keep, "sell_flat": sell},
+        "purchase": purchase,
+        "goals": goals,
         "split_check": round(settings.split_pea + settings.split_cto + settings.split_livrets, 2),
     }
+
+
+BUCKET_KEYS = {"livrets": ("livrets",), "pea": ("pea",), "cto": ("cto",), "av": ("av_balance",), "any": ("pea", "cto", "livrets", "av_balance")}
+
+
+def goals_with_progress(session: Session, rows: list[dict]) -> list[dict]:
+    """Each goal with its horizon and, when it has an amount and a date, what the projection says about it."""
+    today = date.today()
+    result = []
+    for goal in session.exec(select(Goal).order_by(Goal.priority, Goal.target_date, Goal.id)).all():
+        entry = goal.model_dump()
+        months_away = None
+        if goal.target_date:
+            months_away = (goal.target_date.year - today.year) * 12 + goal.target_date.month - today.month
+        entry["horizon"] = "none" if months_away is None else "short" if months_away <= 12 else "medium" if months_away <= 48 else "long"
+        entry["months_away"] = months_away
+        entry["progress"] = None
+        if goal.target_amount and goal.target_date and rows:
+            keys = BUCKET_KEYS.get(goal.funded_by, BUCKET_KEYS["any"])
+            balance = lambda row: sum(row[key] for key in keys)  # noqa: E731
+            target_month = goal.target_date.strftime("%Y-%m")
+            at_date = next((row for row in rows if row["month"] >= target_month), rows[-1])
+            reached = next((row["month"] for row in rows if balance(row) >= goal.target_amount), None)
+            current = balance(rows[0])
+            entry["progress"] = {
+                "projected_at_date": round(balance(at_date), 2), "on_track": balance(at_date) >= goal.target_amount,
+                "gap": round(max(0.0, goal.target_amount - balance(at_date)), 2), "reached_month": reached,
+                "start": round(current, 2), "beyond_projection": goal.target_date.strftime("%Y-%m") > rows[-1]["month"],
+            }
+        result.append(entry)
+    return result
 
 
 @router.patch("/settings")

@@ -1,3 +1,4 @@
+import HelpBox from '../components/HelpBox'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, type ImportSummary } from '../api'
@@ -49,7 +50,21 @@ export default function DocumentsPage() {
 
   return (
     <div>
-      <h1>Documents</h1>
+      <h1>Bank statements</h1>
+      <HelpBox title="How do I get my statements?" open={(documents.data?.length ?? 0) === 0}>
+        <ol>
+          <li>Sign in to your bank's website or app and open <em>Documents</em> / <em>Relevés</em>, or the account history.</li>
+          <li>Download the <strong>PDF statements</strong> (one per month), or use <em>Export / Télécharger</em> to get a <strong>CSV or Excel</strong> file covering several months.</li>
+          <li>Pick the matching account below and upload. Several files at once are fine, and uploading the same file twice never creates duplicates.</li>
+        </ol>
+        <strong>Accepted:</strong> PDF (Crédit Mutuel and LCL layouts are read directly; other layouts need the Claude key), CSV, Excel (.xlsx).
+        A CSV needs a header with a date, a label and either an amount or debit and credit columns, for example:
+        <pre>{`Date;Libellé;Débit;Crédit
+02/03/2026;PRLV SEPA EDF CLIENTS;48,20;
+05/03/2026;VIREMENT SALAIRE ACME;;2450,00`}</pre>
+        <a href="/example-statement.csv" download>Download this example file</a> to test the import.
+        Afterwards, check the <a href="/transactions">Transactions</a> to confirm categories.
+      </HelpBox>
       <div className="card">
         <h2>Import a bank statement</h2>
         <p className="muted small">
