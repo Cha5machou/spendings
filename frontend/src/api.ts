@@ -215,7 +215,93 @@ export interface InsightsData {
   one_offs: { id: number; date: string; label: string; amount: number; category_name: string }[]
 }
 
+export type LoanKind = 'mortgage' | 'personal' | 'revolving' | 'installment' | 'other'
+
+export interface Loan {
+  id: number
+  name: string
+  lender: string | null
+  kind: LoanKind
+  account_id: number | null
+  is_active: boolean
+  original_amount: number | null
+  start_date: string | null
+  remaining_balance: number
+  balance_date: string | null
+  annual_rate: number
+  taeg: number | null
+  monthly_payment: number
+  insurance_monthly: number
+  next_payment_date: string | null
+  payments_remaining: number | null
+  end_date: string | null
+  payment_pattern: string | null
+  notes: string | null
+  has_schedule: boolean
+  current_balance: number
+  months_left: number
+  projected_end: string | null
+  next_payment: { date: string; total: number } | null
+  remaining_interest: number
+  remaining_insurance: number
+  remaining_total: number
+  progress: number | null
+  last_seen_payment: { date: string; amount: number } | null
+}
+
+export interface LoansData {
+  loans: Loan[]
+  totals: {
+    total_debt: number; monthly_payments: number; average_rate: number; remaining_interest_and_insurance: number
+    typical_income: number | null; debt_to_income: number | null; last_payment_date: string | null
+  }
+  timeline: ({ month: string; total: number } & Record<string, number | string>)[]
+  timeline_loans: { id: number; name: string; kind: LoanKind }[]
+}
+
+export interface PayoffPlan {
+  strategy: string
+  extra: number
+  baseline: { months: number; interest: number; debt_free: string }
+  plan: { months: number; interest: number; debt_free: string }
+  interest_saved: number
+  months_saved: number
+  order: { name: string; month: number; date: string; baseline_date: string }[]
+  monthly_budget: number
+}
+
+export interface WhatIf {
+  balance: number
+  annual_rate: number
+  payment_without_insurance: number
+  baseline: { months: number; interest: number; insurance: number; cost: number }
+  lump_sum?: {
+    amount: number; indemnity_max: number; note: string
+    shorter_duration: { months: number; months_saved: number; cost_saved: number }
+    lower_payment: { payment: number; monthly_saving: number }
+  }
+  renegotiation?: { new_rate: number; new_payment: number; monthly_saving: number; interest_saved: number; fees: number; net_saving: number; break_even_months: number }
+}
+
 export const api = {
+  loans: {
+    list: () => request<LoansData>('/loans'),
+    create: (payload: Partial<Loan>) => request<Loan>('/loans', json('POST', payload)),
+    update: (id: number, payload: Partial<Loan>) => request<Loan>(`/loans/${id}`, json('PATCH', payload)),
+    remove: (id: number) => request<void>(`/loans/${id}`, { method: 'DELETE' }),
+    importSchedule: (id: number, file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return request<{ rows: number; first: string; last: string }>(`/loans/${id}/schedule`, { method: 'POST', body: form })
+    },
+    payoff: (extra: number, strategy: string, includeMortgage: boolean) =>
+      request<PayoffPlan>(`/loans/payoff?extra=${extra}&strategy=${strategy}&include_mortgage=${includeMortgage}`),
+    whatIf: (id: number, params: { lump_sum?: number; new_rate?: number; fees?: number }) => {
+      const query = new URLSearchParams()
+      for (const [key, value] of Object.entries(params)) if (value !== undefined && !Number.isNaN(value)) query.set(key, String(value))
+      return request<WhatIf>(`/loans/${id}/what-if?${query}`)
+    },
+  },
   insights: (months = 12) => request<InsightsData>(`/insights?months=${months}`),
 
   health: () => request<Health>('/health'),

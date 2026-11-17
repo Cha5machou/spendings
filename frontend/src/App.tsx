@@ -5,10 +5,12 @@ import DocumentsPage from './pages/DocumentsPage'
 import AccountsPage from './pages/AccountsPage'
 import CategoriesPage from './pages/CategoriesPage'
 import InsightsPage from './pages/InsightsPage'
+import LoansPage from './pages/LoansPage'
 
 const links = [
   { to: '/', label: 'Dashboard' },
   { to: '/insights', label: 'Analysis' },
+  { to: '/loans', label: 'Loans & credits' },
   { to: '/transactions', label: 'Transactions' },
   { to: '/documents', label: 'Documents' },
   { to: '/accounts', label: 'Accounts' },
@@ -33,6 +35,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/loans" element={<LoansPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
