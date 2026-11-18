@@ -14,15 +14,18 @@ browser ──HTTPS──▶ Cloud Run (React + FastAPI) ──▶ Cloud SQL (Po
 
 ## What protects your data
 
-- Every `/api` route except `/api/health` and `/api/config` requires a valid Firebase ID token **and** an e-mail
-  address listed in `ALLOWED_EMAILS` with a verified address. Anyone else gets 401 or 403.
-- If `AUTH_ENABLED=true` but `FIREBASE_PROJECT_ID` or `ALLOWED_EMAILS` is missing, the API refuses every request
-  (it fails closed instead of opening up).
+- Every `/api` route except `/api/health` and `/api/config` requires a valid Firebase ID token **and** a
+  verified Google e-mail address, which must be listed in `ALLOWED_EMAILS` (invite-only) unless `OPEN_SIGNUP=true`.
+  Anyone else gets 401 or 403.
+- If `AUTH_ENABLED=true` but `FIREBASE_PROJECT_ID` is missing, or neither `ALLOWED_EMAILS` nor `OPEN_SIGNUP` is set,
+  the API refuses every request (it fails closed instead of opening up).
+- **Each user only sees their own data.** The verified e-mail is the owner of every row (accounts, transactions,
+  categories, loans, goals, plan, documents...). The database session filters every query on it, so a router cannot
+  read or change another user's rows, even by guessing ids. A new user starts with the default categories.
+- Data that existed before accounts (your local SQLite file) is given to `LEGACY_DATA_OWNER` at startup.
 - The interactive API docs are switched off when auth is on.
 - The database has no authorised networks: only the Cloud Run service account reaches it, through the Cloud SQL
   connector. The bucket blocks public access. Data is encrypted at rest by Google by default.
-- The app is single-user by design (one allow-list, one set of data). Several people sharing one deployment would see
-  the same data; a multi-user version needs a user id on every table.
 
 ## Before you start
 

@@ -52,9 +52,9 @@ class SettingsPayload(BaseModel):
 
 
 def get_settings(session: Session) -> PlanSettings:
-    settings = session.get(PlanSettings, 1)
+    settings = session.exec(select(PlanSettings)).first()  # already limited to the signed-in user
     if settings is None:
-        settings = PlanSettings(id=1)
+        settings = PlanSettings()
         session.add(settings)
         session.commit()
         session.refresh(settings)

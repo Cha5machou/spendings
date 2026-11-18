@@ -34,7 +34,14 @@ class DocumentStatus(str, Enum):
     failed = "failed"
 
 
-class Account(SQLModel, table=True):
+class Owned(SQLModel):
+    """Every user-owned table carries the owner (the signed-in e-mail, or "local" without
+    authentication). app.database filters every query on it and stamps it on every new row."""
+
+    owner: str | None = Field(default=None, index=True)
+
+
+class Account(Owned, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str
     bank: str | None = None
@@ -49,7 +56,7 @@ class Account(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
-class Category(SQLModel, table=True):
+class Category(Owned, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     kind: CategoryKind = CategoryKind.expense
@@ -60,7 +67,7 @@ class Category(SQLModel, table=True):
     necessity: str | None = None
 
 
-class CategoryRule(SQLModel, table=True):
+class CategoryRule(Owned, table=True):
     """Label matching rule: when a transaction label matches `pattern`,
     the transaction gets `category_id`. Highest priority wins."""
 
@@ -80,7 +87,7 @@ class LoanKind(str, Enum):
     other = "other"
 
 
-class Loan(SQLModel, table=True):
+class Loan(Owned, table=True):
     """One debt. A revolving credit with several plans, or several 4x payments, are one row each."""
 
     id: int | None = Field(default=None, primary_key=True)
@@ -106,7 +113,7 @@ class Loan(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
-class LoanScheduleEntry(SQLModel, table=True):
+class LoanScheduleEntry(Owned, table=True):
     """Official amortisation table (imported from the loan offer); overrides the computed projection."""
 
     id: int | None = Field(default=None, primary_key=True)
@@ -119,7 +126,7 @@ class LoanScheduleEntry(SQLModel, table=True):
     total: float
 
 
-class Property(SQLModel, table=True):
+class Property(Owned, table=True):
     """A property the user owns and (usually) rents out. Actual money flows come from transactions
     in the linked categories; the lease terms drive the forward-looking monthly economics."""
 
@@ -151,7 +158,7 @@ class Property(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
-class BalanceSnapshot(SQLModel, table=True):
+class BalanceSnapshot(Owned, table=True):
     """Balance of a savings / investment account on a given day (these accounts have no transactions)."""
 
     id: int | None = Field(default=None, primary_key=True)
@@ -161,7 +168,7 @@ class BalanceSnapshot(SQLModel, table=True):
     source: str | None = None
 
 
-class Holding(SQLModel, table=True):
+class Holding(Owned, table=True):
     """One position inside an investment account, as of a date."""
 
     id: int | None = Field(default=None, primary_key=True)
@@ -174,7 +181,7 @@ class Holding(SQLModel, table=True):
     as_of: datetime.date | None = None
 
 
-class Payslip(SQLModel, table=True):
+class Payslip(Owned, table=True):
     id: int | None = Field(default=None, primary_key=True)
     month: str = Field(index=True)  # YYYY-MM
     employer: str | None = None
@@ -187,7 +194,7 @@ class Payslip(SQLModel, table=True):
     bonus: float | None = None
 
 
-class PropertyDocument(SQLModel, table=True):
+class PropertyDocument(Owned, table=True):
     """A paper about a property (co-ownership call, meeting minutes, agency statement, lease, tax notice...)."""
 
     id: int | None = Field(default=None, primary_key=True)
@@ -209,7 +216,7 @@ class PropertyDocument(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
-class ScheduledPayment(SQLModel, table=True):
+class ScheduledPayment(Owned, table=True):
     """A known one-off payment in the future (tax instalment, annual insurance...). The plan counts it."""
 
     id: int | None = Field(default=None, primary_key=True)
@@ -219,7 +226,7 @@ class ScheduledPayment(SQLModel, table=True):
     notes: str | None = None
 
 
-class Goal(SQLModel, table=True):
+class Goal(Owned, table=True):
     """A goal the user defines. Progress is measured against the plan's projection."""
 
     id: int | None = Field(default=None, primary_key=True)
@@ -233,10 +240,10 @@ class Goal(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
-class PlanSettings(SQLModel, table=True):
-    """The user's planning assumptions (a single row, id = 1)."""
+class PlanSettings(Owned, table=True):
+    """The user's planning assumptions (one row per user)."""
 
-    id: int | None = Field(default=1, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # Onboarding: the user states they have none, so the setup checklist does not nag.
     skipped_loans: bool = False
     skipped_property: bool = False
@@ -265,7 +272,7 @@ class PlanSettings(SQLModel, table=True):
     max_debt_ratio_pct: float = 35.0
 
 
-class Document(SQLModel, table=True):
+class Document(Owned, table=True):
     id: int | None = Field(default=None, primary_key=True)
     account_id: int | None = Field(default=None, foreign_key="account.id")
     filename: str
@@ -282,7 +289,7 @@ class Document(SQLModel, table=True):
     uploaded_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
-class Transaction(SQLModel, table=True):
+class Transaction(Owned, table=True):
     id: int | None = Field(default=None, primary_key=True)
     account_id: int = Field(foreign_key="account.id", index=True)
     document_id: int | None = Field(default=None, foreign_key="document.id")

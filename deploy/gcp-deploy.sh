@@ -6,7 +6,8 @@ cd "$(dirname "$0")/.."
 source deploy/gcp.env
 
 : "${FIREBASE_API_KEY:?Set FIREBASE_API_KEY in deploy/gcp.env}"
-: "${ALLOWED_EMAILS:?Set ALLOWED_EMAILS in deploy/gcp.env}"
+ALLOWED_EMAILS="${ALLOWED_EMAILS:-}"; OPEN_SIGNUP="${OPEN_SIGNUP:-false}"; LEGACY_DATA_OWNER="${LEGACY_DATA_OWNER:-}"
+[[ -n "$ALLOWED_EMAILS" || "$OPEN_SIGNUP" == "true" ]] || { echo "Set ALLOWED_EMAILS or OPEN_SIGNUP=true in deploy/gcp.env"; exit 1; }
 
 ACCOUNT="$(gcloud config get-value account 2>/dev/null)"
 echo "Deploying '$SERVICE' to project '$PROJECT_ID' ($REGION) as: $ACCOUNT"
@@ -28,7 +29,7 @@ gcloud secrets describe anthropic-api-key >/dev/null 2>&1 && SECRETS="${SECRETS}
 gcloud run deploy "$SERVICE" \
   --image "$IMAGE" --region "$REGION" --service-account "$RUN_ACCOUNT" \
   --add-cloudsql-instances "$CONNECTION" \
-  --set-env-vars "^|^AUTH_ENABLED=true|FIREBASE_PROJECT_ID=${PROJECT_ID}|FIREBASE_API_KEY=${FIREBASE_API_KEY}|FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}|ALLOWED_EMAILS=${ALLOWED_EMAILS}|STORAGE_BACKEND=gcs|GCS_BUCKET=${BUCKET}|DB_USER=${SERVICE}|DB_NAME=${SERVICE}|CLOUD_SQL_CONNECTION_NAME=${CONNECTION}|CORS_ORIGINS=[]" \
+  --set-env-vars "^|^AUTH_ENABLED=true|FIREBASE_PROJECT_ID=${PROJECT_ID}|FIREBASE_API_KEY=${FIREBASE_API_KEY}|FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}|ALLOWED_EMAILS=${ALLOWED_EMAILS}|OPEN_SIGNUP=${OPEN_SIGNUP}|LEGACY_DATA_OWNER=${LEGACY_DATA_OWNER}|STORAGE_BACKEND=gcs|GCS_BUCKET=${BUCKET}|DB_USER=${SERVICE}|DB_NAME=${SERVICE}|CLOUD_SQL_CONNECTION_NAME=${CONNECTION}|CORS_ORIGINS=[]" \
   --set-secrets "$SECRETS" \
   --allow-unauthenticated \
   --min-instances 0 --max-instances 2 --memory 512Mi --cpu 1 --concurrency 20 --timeout 300

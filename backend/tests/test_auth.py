@@ -51,6 +51,15 @@ def test_invalid_token_is_rejected(client, monkeypatch):
     assert client.get("/secret", headers={"Authorization": "Bearer nope"}).status_code == 401
 
 
+def test_open_signup_lets_any_verified_email_in(client, monkeypatch):
+    configure(monkeypatch, auth_enabled=True, firebase_project_id="demo", allowed_emails=[], open_signup=True)
+    monkeypatch.setattr(auth, "verify_token", lambda token: {"email": "New@Example.com", "email_verified": True})
+    response = client.get("/secret", headers={"Authorization": "Bearer good"})
+    assert response.json() == {"user": "new@example.com"}
+    monkeypatch.setattr(auth, "verify_token", lambda token: {"email": "new@example.com", "email_verified": False})
+    assert client.get("/secret", headers={"Authorization": "Bearer good"}).status_code == 403
+
+
 @pytest.mark.parametrize("claims, status", [
     ({"email": "me@example.com", "email_verified": True}, 200),
     ({"email": "ME@Example.com", "email_verified": True}, 200),
@@ -59,6 +68,6 @@ def test_invalid_token_is_rejected(client, monkeypatch):
     ({}, 403),
 ])
 def test_allow_list(client, monkeypatch, claims, status):
-    configure(monkeypatch, auth_enabled=True, firebase_project_id="demo", allowed_emails=["me@example.com"])
+    configure(monkeypatch, auth_enabled=True, firebase_project_id="demo", allowed_emails=["me@example.com"], open_signup=False)
     monkeypatch.setattr(auth, "verify_token", lambda token: claims)
     assert client.get("/secret", headers={"Authorization": "Bearer good"}).status_code == status

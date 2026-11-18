@@ -31,12 +31,22 @@ class Settings(BaseSettings):
     firebase_api_key: str | None = None  # web config values are public identifiers, not secrets
     firebase_auth_domain: str | None = None
     allowed_emails: Annotated[list[str], NoDecode] = []  # comma separated in the environment
+    # Anyone with a verified Google account may sign up (each user only sees their own data).
+    # Without it, ALLOWED_EMAILS is required: an unconfigured deployment stays closed.
+    open_signup: bool = False
+    # E-mail that inherits the data created before per-user accounts existed (migration, runs at startup).
+    legacy_data_owner: str | None = None
 
     # Cloud SQL (PostgreSQL) through the Cloud Run unix socket, as an alternative to DATABASE_URL.
     db_user: str | None = None
     db_password: str | None = None
     db_name: str | None = None
     cloud_sql_connection_name: str | None = None  # project:region:instance
+
+    @field_validator("legacy_data_owner", mode="before")
+    @classmethod
+    def lowercase_owner(cls, value):
+        return value.strip().lower() if isinstance(value, str) and value.strip() else None
 
     @field_validator("allowed_emails", mode="before")
     @classmethod

@@ -128,7 +128,7 @@ def run_tool(name: str, arguments: dict, session: Session):
         return strip_plan(compute_plan(session, get_settings(session)))
     if name == "run_plan_scenario":
         base = get_settings(session).model_dump()
-        allowed = set(PlanSettings.model_fields) - {"id"}
+        allowed = set(PlanSettings.model_fields) - {"id", "owner"}
         overrides = {key: value for key, value in (arguments.get("overrides") or {}).items() if key in allowed}
         for key in ("sale_date", "purchase_date"):
             if isinstance(overrides.get(key), str):

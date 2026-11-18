@@ -4,21 +4,16 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlmodel import Session
-
 from app.auth import require_user
 from app.config import settings
-from app.database import create_tables, engine
+from app.database import create_tables
 from app.extraction import claude_extractor
 from app.routers import accounts, actions, assistant, categories, dashboard, documents, flows, goals, income, insights, loans, plan, properties, property_documents, scheduled, setup, transactions, wealth
-from app.seed import seed_defaults
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     create_tables()
-    with Session(engine) as session:
-        seed_defaults(session)
     yield
 
 
